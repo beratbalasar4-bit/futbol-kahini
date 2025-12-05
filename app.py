@@ -3,53 +3,42 @@ import streamlit.components.v1 as components
 import pandas as pd
 import plotly.graph_objects as go
 import time
+import random
 
-# --- 1. SAYFA VE İKON AYARLARI (LOGOLU) ---
-# page_icon kısmına bir futbol topu veya aslan emojisi yerine link de koyabiliriz ama emoji daha hızlı açılır.
-st.set_page_config(page_title="Futbol Kahini Pro", page_icon="🦁", layout="wide")
+# --- SAYFA AYARLARI ---
+st.set_page_config(page_title="Futbol Kahini SuperApp", page_icon="🦁", layout="wide")
 
-# --- TASARIM (CSS) ---
+# --- TASARIM VE CSS ---
 st.markdown("""
 <style>
     .stApp { background-color: #0E1117; }
     h1 { color: #00CC96 !important; text-align: center; font-family: 'Arial Black', sans-serif; }
-    .kupon-karti { background-color: #1F2937; padding: 20px; border-radius: 15px; border-left: 10px solid #00CC96; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+    
+    /* Form Kutucukları */
+    .form-box { display: inline-block; width: 30px; height: 30px; margin: 2px; text-align: center; line-height: 30px; color: white; border-radius: 5px; font-weight: bold; font-size: 14px; }
+    .win { background-color: #2ECC71; }
+    .draw { background-color: #95A5A6; }
+    .loss { background-color: #E74C3C; }
+
+    /* Kupon Kartı */
+    .kupon-karti { background-color: #1F2937; padding: 20px; border-radius: 15px; border-left: 8px solid #00CC96; margin-bottom: 15px; }
+    
     .stButton>button { 
         background: linear-gradient(to right, #00CC96, #00b887); 
-        color: white; width: 100%; border-radius: 12px; height: 55px; font-size: 20px; border: none; font-weight: bold;
+        color: white; width: 100%; border-radius: 10px; height: 50px; border: none; font-weight: bold;
     }
-    .stButton>button:hover { transform: scale(1.02); transition: 0.3s; }
-    /* Yan Menü Düzeni */
-    [data-testid="stSidebar"] { background-color: #111; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- YAN MENÜ (LOGO VE SOSYAL MEDYA) ---
+# --- YAN MENÜ ---
 with st.sidebar:
-    # BURAYA LOGO GELİYOR
-    st.image("https://cdn-icons-png.flaticon.com/512/3233/3233496.png", width=120) 
-    st.markdown("<h2 style='text-align: center; color: white;'>FUTBOL KAHİNİ</h2>", unsafe_allow_html=True)
+    st.image("https://cdn-icons-png.flaticon.com/512/3233/3233496.png", width=100)
+    st.markdown("### 🦁 SÜPER ASİSTAN")
+    st.info("Bu sürümde Form Analizi, Otomatik Kupon ve Sohbet Robotu bir arada!")
     st.markdown("---")
-    
-    st.info("💡 **İPUCU:** Sol üstteki menüden lig seçimi yapabilirsin.")
-    
-    # TELEGRAM / GRUP BUTONU (PARA KAZANMA ADIMI)
-    st.markdown("### 💎 VIP GRUP")
-    st.link_button("👉 Telegram'a Katıl", "https://t.me/berat_futbol_kahini") # Buraya kendi linkini koyarsın
-    st.caption("Banko kuponlar ve özel analizler için grubumuza katıl.")
+    st.link_button("👉 Telegram Grubumuz", "https://t.me/ornek_link")
 
-# --- BAŞLIK ---
-st.title("🌍 FUTBOL KAHİNİ GLOBAL")
-st.markdown("<p style='text-align: center; color: gray;'>Yapay Zeka Destekli Profesyonel Analiz Merkezi</p>", unsafe_allow_html=True)
-
-# --- CANLI SKOR ---
-with st.expander("🔴 CANLI MAÇLARI GÖSTER (Livescore)", expanded=False):
-    components.html(
-        """<iframe src="https://www.livescore.bz" width="100%" height="600" frameborder="0" style="background-color: white; border-radius: 8px;"></iframe>""",
-        height=600, scrolling=True
-    )
-
-st.divider()
+st.title("🌍 FUTBOL KAHİNİ SÜPER APP")
 
 # --- VERİ MOTORU ---
 lig_kodlari = {
@@ -58,8 +47,7 @@ lig_kodlari = {
     "🇪🇸 İspanya La Liga": "SP1.csv",
     "🇩🇪 Almanya Bundesliga": "D1.csv",
     "🇮🇹 İtalya Serie A": "I1.csv",
-    "🇫🇷 Fransa Ligue 1": "F1.csv",
-    "🇳🇱 Hollanda Eredivisie": "N1.csv"
+    "🇫🇷 Fransa Ligue 1": "F1.csv"
 }
 
 takim_duzeltme = {
@@ -72,10 +60,8 @@ takim_duzeltme = {
 @st.cache_data(ttl=3600)
 def veri_getir(secilen_lig):
     dosya_adi = lig_kodlari[secilen_lig]
-    # URL Parçalama
     ana_url = "https://www.football-data.co.uk/mmz4281/2425/"
     full_url = ana_url + dosya_adi
-    
     try:
         df = pd.read_csv(full_url)
         df = df.dropna(subset=['FTR'])
@@ -84,101 +70,160 @@ def veri_getir(secilen_lig):
         return df
     except: return None
 
-# --- ANALİZ EKRANI ---
-st.subheader("🏆 DETAYLI ANALİZ MASASI")
-
-secilen_lig = st.selectbox("Ligi Seçiniz:", list(lig_kodlari.keys()))
-df = veri_getir(secilen_lig)
-
-if df is not None:
-    takimlar = sorted(df['HomeTeam'].unique())
-    col1, col2 = st.columns(2)
-    with col1: ev = st.selectbox("Ev Sahibi", takimlar)
-    with col2: dep = st.selectbox("Deplasman", takimlar, index=1)
-
-    st.write("")
+# --- YARDIMCI: FORM HESAPLAMA (SON 5 MAÇ) ---
+def form_getir(takim, df):
+    # Takımın oynadığı son 5 maçı bul
+    maclar = df[(df['HomeTeam'] == takim) | (df['AwayTeam'] == takim)].tail(5)
+    html_kod = ""
     
-    if st.button("DETAYLI KUPON OLUŞTUR 🚀"):
-        with st.spinner('Yapay Zeka Hesaplıyor...'):
-            time.sleep(0.8)
+    for index, row in maclar.iterrows():
+        sonuc = "B"
+        renk = "draw"
+        
+        if row['HomeTeam'] == takim:
+            if row['FTR'] == 'H': sonuc, renk = "G", "win"
+            elif row['FTR'] == 'A': sonuc, renk = "M", "loss"
+        else: # Deplasman
+            if row['FTR'] == 'A': sonuc, renk = "G", "win"
+            elif row['FTR'] == 'H': sonuc, renk = "M", "loss"
             
+        html_kod += f"<div class='form-box {renk}'>{sonuc}</div>"
+    
+    return html_kod if html_kod else "<span style='color:gray'>Veri Yok</span>"
+
+# --- ANA SEKME YAPISI ---
+tab1, tab2, tab3 = st.tabs(["📊 DETAYLI ANALİZ", "🎰 OTOMATİK KUPON", "🤖 AI SOHBET"])
+
+# ================= SEKME 1: ANALİZ & FORM =================
+with tab1:
+    col_lig = st.selectbox("Lig Seçiniz:", list(lig_kodlari.keys()), key="lig1")
+    df = veri_getir(col_lig)
+
+    if df is not None:
+        takimlar = sorted(df['HomeTeam'].unique())
+        c1, c2 = st.columns(2)
+        with c1: ev = st.selectbox("Ev Sahibi", takimlar)
+        with c2: dep = st.selectbox("Deplasman", takimlar, index=1)
+
+        # FORM DURUMU GÖSTERGESİ (YENİ!)
+        st.markdown("### 📈 SON 5 MAÇ FORMU")
+        f1, f2 = st.columns(2)
+        with f1: 
+            st.markdown(f"**{ev}**")
+            st.markdown(form_getir(ev, df), unsafe_allow_html=True)
+        with f2: 
+            st.markdown(f"**{dep}**")
+            st.markdown(form_getir(dep, df), unsafe_allow_html=True)
+        
+        st.write("")
+        if st.button("MAÇI ANALİZ ET 🚀"):
             ev_stats = df[df['HomeTeam'] == ev]
             dep_stats = df[df['AwayTeam'] == dep]
-
-            if len(ev_stats) > 0 and len(dep_stats) > 0:
+            
+            if len(ev_stats) > 0:
                 # Hesaplamalar
-                ev_gol_ort = (ev_stats['FTHG'].mean() + ev_stats['FTAG'].mean()) / 2
-                dep_gol_ort = (dep_stats['FTHG'].mean() + dep_stats['FTAG'].mean()) / 2
-                mac_gol_beklentisi = (ev_gol_ort + dep_gol_ort)
-                
-                # Korner (Varsayılan veya Gerçek)
-                if 'HC' in df.columns:
-                    ev_korner = ev_stats['HC'].mean() + ev_stats['AC'].mean()
-                    dep_korner = dep_stats['HC'].mean() + dep_stats['AC'].mean()
-                    toplam_korner = (ev_korner + dep_korner) / 2
-                else: toplam_korner = 9.0
-                
-                # Kart
-                if 'HY' in df.columns:
-                    ev_kart = ev_stats['HY'].mean() + ev_stats['AY'].mean()
-                    dep_kart = dep_stats['HY'].mean() + dep_stats['AY'].mean()
-                    toplam_kart = (ev_kart + dep_kart) / 2
-                else: toplam_kart = 4.0
-
-                # İbre
-                ev_puan = (ev_stats['FTHG'].mean() * 40) - (ev_stats['FTAG'].mean() * 20)
-                dep_puan = (dep_stats['FTAG'].mean() * 40) - (dep_stats['FTHG'].mean() * 20)
-                fark = ev_puan - dep_puan
-                ibre = 50 + (fark / 1.8)
+                ev_guc = (ev_stats['FTHG'].mean() * 40) + 10
+                dep_guc = (dep_stats['FTAG'].mean() * 40) + 10
+                fark = ev_guc - dep_guc
+                ibre = 50 + (fark / 1.5)
                 ibre = max(10, min(90, ibre))
+                
+                # İbre
+                fig_gauge = go.Figure(go.Indicator(
+                    mode = "gauge+number", value = ibre,
+                    title = {'text': "Ev Sahibi Şansı %"},
+                    gauge = {'axis': {'range': [0, 100]}, 'bar': {'color': "white"}, 'steps': [{'range': [0, 45], 'color': "#FF4B4B"}, {'range': [55, 100], 'color': "#00CC96"}]}
+                ))
+                fig_gauge.update_layout(height=250, margin=dict(t=30,b=20,l=20,r=20), paper_bgcolor='rgba(0,0,0,0)')
+                st.plotly_chart(fig_gauge, use_container_width=True)
+                
+                # Yorum
+                if ibre > 60: st.success(f"🔥 **{ev}** favori görünüyor!")
+                elif ibre < 40: st.error(f"⚠️ **{dep}** sürpriz yapabilir!")
+                else: st.warning("⚖️ Maç ortada görünüyor.")
 
-                # --- SONUÇ KARTI ---
-                st.markdown(f"""
-                <div class="kupon-karti">
-                    <h2 style="text-align:center; color:white;">MAÇ RAPORU</h2>
-                    <h3 style="text-align:center; color:#00CC96;">{ev} vs {dep}</h3>
-                    <hr style="border-color:gray;">
-                </div>
-                """, unsafe_allow_html=True)
+# ================= SEKME 2: OTOMATİK KUPON =================
+with tab2:
+    st.subheader("🤖 YAPAY ZEKA GÜNÜN KUPONU")
+    st.info("Yapay zeka seçilen ligdeki en güçlü ev sahiplerini tarar.")
+    
+    lig_oto = st.selectbox("Hangi ligden kupon yapalım?", list(lig_kodlari.keys()), key="lig2")
+    
+    if st.button("BANKO KUPON YARAT 🎰"):
+        df_oto = veri_getir(lig_oto)
+        if df_oto is not None:
+            with st.spinner("Maçlar taranıyor..."):
+                time.sleep(1)
+                # Basit Algoritma: En çok gol atan ev sahipleri
+                takimlar = df_oto['HomeTeam'].unique()
+                liste = []
+                for t in takimlar:
+                    s = df_oto[df_oto['HomeTeam'] == t]
+                    if len(s) > 0:
+                        puan = s['FTHG'].mean() * 2 - s['FTAG'].mean()
+                        liste.append({"Takım": t, "Puan": puan})
+                
+                en_iyiler = sorted(liste, key=lambda x: x['Puan'], reverse=True)[:3]
+                
+                for mac in en_iyiler:
+                    st.markdown(f"""
+                    <div class="kupon-karti">
+                        <h3 style="color:#00CC96; margin:0;">{mac['Takım']}</h3>
+                        <p style="color:white;">Yapay Zeka Güven Skoru: <b>{mac['Puan']:.2f}</b></p>
+                        <small style="color:gray;">Tahmin: Maç Sonucu 1</small>
+                    </div>
+                    """, unsafe_allow_html=True)
 
-                k1, k2, k3, k4 = st.columns(4)
-                with k1:
-                    st.info("🏆 MAÇ SONUCU")
-                    if ibre > 60: st.markdown(f"**{ev}** (MS 1)")
-                    elif ibre < 40: st.markdown(f"**{dep}** (MS 2)")
-                    else: st.markdown("**BERABERLİK** (MS 0)")
-                with k2:
-                    st.warning("⚽ GOL")
-                    if mac_gol_beklentisi > 2.6: st.markdown("**2.5 ÜST**")
-                    else: st.markdown("**2.5 ALT**")
-                with k3:
-                    st.success("⛳ KORNER")
-                    st.markdown(f"Tahmin: **{toplam_korner:.1f}**")
-                with k4:
-                    st.error("🟨 KART")
-                    st.markdown(f"Ort: **{toplam_kart:.1f}**")
+# ================= SEKME 3: AI SOHBET (CHATBOT) =================
+with tab3:
+    st.subheader("💬 FUTBOL ASİSTANI İLE SOHBET ET")
+    st.caption("Takımlar hakkında sorular sorabilirsin. (Örn: 'Galatasaray gol durumu', 'Fener formda mı?')")
 
-                st.divider()
+    # Chat Geçmişi
+    if "messages" not in st.session_state:
+        st.session_state.messages = [{"role": "assistant", "content": "Merhaba! Hangi takımı merak ediyorsun?"}]
 
-                # Grafikler
-                g1, g2 = st.columns([2, 1])
-                with g1:
-                    categories = ['Hücum', 'Defans', 'Korner', 'Sertlik', 'Form']
-                    fig = go.Figure()
-                    fig.add_trace(go.Scatterpolar(r=[ev_puan, 80, toplam_korner*8, toplam_kart*15, ev_puan], theta=categories, fill='toself', name=ev, line_color='#00CC96'))
-                    fig.add_trace(go.Scatterpolar(r=[dep_puan, 60, toplam_korner*7, toplam_kart*15, dep_puan], theta=categories, fill='toself', name=dep, line_color='#FF4B4B'))
-                    fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), template="plotly_dark", title="Detaylı Analiz", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-                    st.plotly_chart(fig, use_container_width=True)
-                with g2:
-                    fig_gauge = go.Figure(go.Indicator(
-                        mode = "gauge+number", value = ibre, title = {'text': "Kazanma Şansı %"},
-                        gauge = {'axis': {'range': [0, 100]}, 'bar': {'color': "white"}, 'steps': [{'range': [0, 45], 'color': "#FF4B4B"}, {'range': [45, 55], 'color': "gray"}, {'range': [55, 100], 'color': "#00CC96"}]}
-                    ))
-                    fig_gauge.update_layout(height=300, margin=dict(t=50,b=20,l=20,r=20), paper_bgcolor='rgba(0,0,0,0)')
-                    st.plotly_chart(fig_gauge, use_container_width=True)
-            else: st.error("Veri yetersiz.")
-else: st.info("Veri sunucusu bekleniyor...")
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]):
+            st.write(msg["content"])
 
-# --- FOOTER (ALT BİLGİ) ---
-st.markdown("---")
-st.markdown("<p style='text-align: center; color: gray; font-size: 12px;'>© 2024 Futbol Kahini - Bu bir yapay zeka analiz aracıdır. Bahis tavsiyesi değildir.</p>", unsafe_allow_html=True)
+    # Kullanıcı Girişi
+    if prompt := st.chat_input("Sorunu yaz..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.write(prompt)
+
+        # --- BASİT CEVAP MOTORU ---
+        cevap = "Bunu tam anlayamadım, daha basit sorar mısın?"
+        prompt_lower = prompt.lower()
+        
+        # Seçili ligdeki veriyi kullan
+        df_chat = veri_getir(col_lig) 
+        if df_chat is not None:
+            takimlar = df_chat['HomeTeam'].unique()
+            bulunan_takim = None
+            
+            # Mesajda takım ismi ara
+            for t in takimlar:
+                if t.lower() in prompt_lower:
+                    bulunan_takim = t
+                    break
+            
+            if bulunan_takim:
+                stats = df_chat[df_chat['HomeTeam'] == bulunan_takim]
+                gol_ort = stats['FTHG'].mean()
+                if "gol" in prompt_lower:
+                    cevap = f"⚽ **{bulunan_takim}** bu sezon evinde maç başına ortalama **{gol_ort:.2f} gol** atıyor. Hücum hattı {'çok iyi' if gol_ort > 2 else 'ortalama'}."
+                elif "form" in prompt_lower or "durum" in prompt_lower:
+                    cevap = f"📈 **{bulunan_takim}** için verileri inceledim. İç saha performansı puanı: **{gol_ort*10:.0f}/30**. Detaylı analiz sekmesine bakmanı öneririm."
+                elif "kazanır mı" in prompt_lower:
+                    cevap = f"🤔 **{bulunan_takim}** maçı için rakibe de bakmam lazım. Analiz sekmesinden rakibi seçersen sana net yüzde veririm."
+                else:
+                    cevap = f"🤖 **{bulunan_takim}** hakkında istatistiklerim var. Gollerini mi yoksa form durumunu mu merak ediyorsun?"
+            else:
+                if "merhaba" in prompt_lower: cevap = "Selam! Bugün hangi maçı analiz edelim?"
+                elif "kupon" in prompt_lower: cevap = "Otomatik kupon sekmesine geçersen sana günün bankolarını verebilirim."
+        
+        with st.chat_message("assistant"):
+            st.write(cevap)
+        st.session_state.messages.append({"role": "assistant", "content": cevap})
