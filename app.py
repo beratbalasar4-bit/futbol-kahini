@@ -42,7 +42,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- 2024-2025 SEZONU RESMİ VE GÜNCEL TAKIM LİSTELERİ ---
-# Bu liste sabittir. Veri kaynağı hata yapsa bile burası doğru kalır.
 LIG_TAKIMLARI = {
     "🇹🇷 Süper Lig": [
         "Galatasaray", "Fenerbahçe", "Beşiktaş", "Trabzonspor", "Başakşehir", "Kasımpaşa", 
@@ -86,7 +85,7 @@ CSV_LINKS = {
     "🇫🇷 Ligue 1": "F1.csv"
 }
 
-# İsim Eşleştirme (CSV'deki isimleri Bizim Listeye Çevirir)
+# İsim Eşleştirme
 ISIM_DUZELTME = {
     "Fenerbahce": "Fenerbahçe", "Galatasaray": "Galatasaray", "Besiktas": "Beşiktaş",
     "Adana Demir": "Adana Demirspor", "Konyaspor": "Konyaspor", "Kasimpasa": "Kasımpaşa",
@@ -136,15 +135,13 @@ def poisson_hesapla(ev_val, dep_val):
     return ms1, ms0, ms2, kg_var, ust
 
 def detayli_analiz(ev, dep, df):
-    # Veri varsa çek, yoksa varsayılan (Yeni takım simülasyonu)
+    # Veri varsa çek, yoksa varsayılan
     if df is not None:
         ev_stats = df[df['HomeTeam'] == ev]
         dep_stats = df[df['AwayTeam'] == dep]
-        lig_gol_ort = df['FTHG'].mean() + df['FTAG'].mean()
     else:
         ev_stats = pd.DataFrame()
         dep_stats = pd.DataFrame()
-        lig_gol_ort = 2.5 # Varsayılan lig ortalaması
 
     # Veri yoksa (Yeni Sezon/Yeni Takım) -> Ortalama değerler ata
     ev_g = safe_mean(ev_stats['FTHG']) if not ev_stats.empty else 1.3
@@ -155,8 +152,8 @@ def detayli_analiz(ev, dep, df):
     ev_sut = safe_mean(ev_stats['HS']) if not ev_stats.empty and 'HS' in ev_stats else 12.5
     dep_sut = safe_mean(dep_stats['AS']) if not dep_stats.empty and 'AS' in dep_stats else 10.0
     
-    # Poisson Beklentileri
-    ev_beklenti = (ev_g + dep_y) / 2 * 1.1 (ev sahibi avantajı)
+    # Poisson Beklentileri (HATA BURADAYDI, DÜZELTİLDİ)
+    ev_beklenti = ((ev_g + dep_y) / 2) * 1.1 # 1.1 ev sahibi avantajı
     dep_beklenti = (dep_g + ev_y) / 2
     
     ms1, ms0, ms2, kg, ust = poisson_hesapla(ev_beklenti, dep_beklenti)
@@ -164,9 +161,6 @@ def detayli_analiz(ev, dep, df):
     # Skor Tahmini
     skor_ev = int(round(ev_beklenti))
     skor_dep = int(round(dep_beklenti))
-    
-    # İbre
-    ibre = ms1 + (ms0 / 3) # Basit güç skoru
     
     return {
         "skor": f"{skor_ev} - {skor_dep}",
@@ -178,7 +172,7 @@ def detayli_analiz(ev, dep, df):
     }
 
 # --- ARAYÜZ ---
-st.title("🦁 FUTBOL KAHİNİ V36")
+st.title("🦁 FUTBOL KAHİNİ V37")
 
 tab1, tab2, tab3 = st.tabs(["📊 PRO ANALİZ", "📝 RAW VERİ", "🤖 ASİSTAN"])
 
@@ -257,4 +251,4 @@ with tab3:
     if prompt := st.chat_input("Yaz bakalım..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         st.chat_message("user").write(prompt)
-        st.chat_message("assistant").write("Analiz sekmesindeki verileri inceleyip sana döneceğim.")
+        st.chat_message("assistant").write("Analiz sekmesinden verileri inceleyip sana döneceğim.")
