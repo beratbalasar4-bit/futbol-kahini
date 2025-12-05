@@ -2,67 +2,67 @@ import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.express as px
 import datetime
 
 # --- SAYFA AYARLARI ---
-st.set_page_config(page_title="Futbol Kahini Pro", page_icon="⚽", layout="wide")
+st.set_page_config(page_title="Futbol Kahini Masterclass", page_icon="🧠", layout="wide")
 
-# --- CSS (NEON VE PROFESYONEL) ---
+# --- CSS (NEON & PRO TASARIM) ---
 st.markdown("""
 <style>
-    /* Ana Arka Plan */
-    .stApp { background-color: #0E1117; color: #E0E0E0; }
-    
-    /* BAŞLIKLAR */
+    .stApp { background-color: #050505; color: #E0E0E0; }
     h1, h2, h3, h4 { color: #00E676 !important; font-family: 'Arial Black', sans-serif; text-transform: uppercase; letter-spacing: 1px; }
     
-    /* SEÇİM KUTULARI */
-    .stSelectbox label p { font-size: 18px !important; color: #00E676 !important; font-weight: bold !important; }
-    div[data-baseweb="select"] > div { background-color: #1F2937 !important; border: 2px solid #00E676 !important; color: white !important; border-radius: 8px !important; }
-    div[data-baseweb="select"] span { color: #00E676 !important; font-weight: bold !important; font-size: 16px !important; }
-    div[data-baseweb="select"] svg { fill: #00E676 !important; }
+    /* NEON SEÇİM KUTULARI */
+    .stSelectbox label p { font-size: 16px !important; color: #00E676 !important; font-weight: bold; }
+    div[data-baseweb="select"] > div { background-color: #121212 !important; border: 1px solid #00E676 !important; color: white !important; }
     
-    /* İstatistik Kartları */
-    .stat-card { background-color: #1F2937; padding: 15px; border-radius: 10px; border: 1px solid #374151; text-align: center; margin-bottom: 10px; box-shadow: 0 4px 10px rgba(0, 230, 118, 0.1); }
-    .big-score { font-size: 28px; font-weight: bold; color: #00E676; margin: 5px 0; text-shadow: 0 0 10px rgba(0,230,118,0.5); }
-    .card-title { font-size: 13px; color: #B0BEC5; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; }
-    
-    /* Canlı Form Penceresi Başlığı */
-    .live-header { background: linear-gradient(90deg, #1F2937 0%, #00E676 100%); padding: 10px; border-radius: 5px; color: white; font-weight: bold; margin-top: 20px; }
+    /* ANALİZ KUTULARI */
+    .metric-card {
+        background: linear-gradient(145deg, #1a1a1a, #121212);
+        padding: 15px; border-radius: 10px; border-left: 5px solid #00E676;
+        text-align: center; margin-bottom: 10px; box-shadow: 0 4px 15px rgba(0,230,118,0.1);
+    }
+    .metric-title { font-size: 12px; color: #aaa; text-transform: uppercase; letter-spacing: 1px; }
+    .metric-value { font-size: 24px; font-weight: bold; color: white; margin-top: 5px; }
+    .metric-sub { font-size: 11px; color: #00E676; }
 
-    /* Buton */
-    .stButton>button { background-color: #00E676; color: black !important; font-weight: 900 !important; border-radius: 8px; height: 55px; border: 2px solid #00C853; width: 100%; font-size: 20px !important; box-shadow: 0 0 15px rgba(0, 230, 118, 0.4); }
-    .stButton>button:hover { background-color: #00C853; color: white !important; transform: scale(1.02); }
+    /* TAKTİK KARTLARI */
+    .tactic-box {
+        background-color: #1E1E1E; padding: 20px; border-radius: 12px; border: 1px solid #333; margin-top: 10px;
+    }
+    .tactic-header { color: #00E676; font-weight: bold; font-size: 18px; border-bottom: 1px solid #444; padding-bottom: 10px; margin-bottom: 10px; }
+    .tactic-text { font-size: 15px; line-height: 1.6; color: #ddd; }
     
+    /* Canlı Pencere Başlığı (Küçük) */
+    .live-small { font-size: 14px; background: #222; padding: 5px 10px; border-radius: 5px; border-left: 3px solid #00E676; color: white; margin-bottom: 5px;}
+
     /* Sekme */
-    .stTabs [aria-selected="true"] { background-color: #00E676; color: black !important; font-weight: bold; border-radius: 5px; }
+    .stTabs [aria-selected="true"] { background-color: #00E676; color: black !important; font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- GENİŞLETİLMİŞ LİG VE VERİ LİNKLERİ ---
+# --- VERİ SETLERİ ---
 lig_yapilandirma = {
     "🇹🇷 Türkiye Süper Lig": {"csv": "T1.csv", "live": "https://www.flashscore.mobi/standings/W6BOzpK2/U3MvIVsA/#table/overall"},
     "🇬🇧 İngiltere Premier": {"csv": "E0.csv", "live": "https://www.flashscore.mobi/standings/dYlOSQ44/W6DOvJ92/#table/overall"},
     "🇪🇸 İspanya La Liga": {"csv": "SP1.csv", "live": "https://www.flashscore.mobi/standings/QVmLl54o/dG2SqPPf/#table/overall"},
-    "🇩🇪 Almanya Bundesliga": {"csv": "D1.csv", "live": "https://www.flashscore.mobi/standings/W6BOzpK2/U3MvIVsA/#table/overall"}, # Linkler örnek, dinamik değişebilir
+    "🇩🇪 Almanya Bundesliga": {"csv": "D1.csv", "live": "https://www.flashscore.mobi/standings/W6BOzpK2/U3MvIVsA/#table/overall"},
     "🇮🇹 İtalya Serie A": {"csv": "I1.csv", "live": "https://www.flashscore.mobi/standings/dYlOSQ44/W6DOvJ92/#table/overall"},
     "🇫🇷 Fransa Ligue 1": {"csv": "F1.csv", "live": "https://www.flashscore.mobi/standings/W6BOzpK2/U3MvIVsA/#table/overall"},
     "🇳🇱 Hollanda Eredivisie": {"csv": "N1.csv", "live": "https://www.flashscore.mobi"},
-    "🇵🇹 Portekiz Liga NOS": {"csv": "P1.csv", "live": "https://www.flashscore.mobi"},
-    "🇧🇪 Belçika Jupiler": {"csv": "B1.csv", "live": "https://www.flashscore.mobi"},
-    "🏴󠁧󠁢󠁳󠁣󠁴󠁿 İskoçya Premiership": {"csv": "SC0.csv", "live": "https://www.flashscore.mobi"},
-    "🇬🇷 Yunanistan Süper Lig": {"csv": "G1.csv", "live": "https://www.flashscore.mobi"}
+    "🇵🇹 Portekiz Liga NOS": {"csv": "P1.csv", "live": "https://www.flashscore.mobi"}
 }
 
 takim_duzeltme = {
     "Fenerbahce": "Fenerbahçe", "Galatasaray": "Galatasaray", "Besiktas": "Beşiktaş", "Trabzonspor": "Trabzonspor",
-    "Buyuksehyr": "Başakşehir", "Man City": "Man City", "Man United": "Man Utd",
-    "Real Madrid": "R. Madrid", "Barcelona": "Barcelona", "Bayern Munich": "Bayern",
-    "Dortmund": "Dortmund", "Paris SG": "PSG", "Inter": "Inter", "Milan": "Milan", "Juventus": "Juve",
-    "Benfica": "Benfica", "Porto": "Porto", "Ajax": "Ajax"
+    "Buyuksehyr": "Başakşehir", "Man City": "Man City", "Man United": "Man Utd", "Real Madrid": "R. Madrid", 
+    "Barcelona": "Barcelona", "Bayern Munich": "Bayern", "Dortmund": "Dortmund", "Paris SG": "PSG", 
+    "Inter": "Inter", "Milan": "Milan", "Juventus": "Juve", "Benfica": "Benfica", "Porto": "Porto", "Ajax": "Ajax"
 }
 
-# --- VERİ YÜKLEME VE AKILLI TARİH DÜZELTME ---
+# --- VERİ YÜKLEME ---
 @st.cache_data(ttl=3600)
 def veri_yukle(lig_ad):
     ana_url = "https://www.football-data.co.uk/mmz4281/2425/" 
@@ -71,70 +71,105 @@ def veri_yukle(lig_ad):
         url = ana_url + dosya
         df = pd.read_csv(url)
         df = df.dropna(subset=['FTR'])
-        
-        # Tarih formatı bazen DD/MM/YY bazen MM/DD/YY geliyor. Bunu zorluyoruz.
-        # errors='coerce' hatalı tarihleri NaT yapar, sonra onları sileriz.
         df['Date'] = pd.to_datetime(df['Date'], dayfirst=True, errors='coerce')
-        df = df.dropna(subset=['Date']) 
-        df = df.sort_values(by='Date') # Eskiden yeniye sırala
-        
+        df = df.sort_values(by='Date')
         df['HomeTeam'] = df['HomeTeam'].replace(takim_duzeltme)
         df['AwayTeam'] = df['AwayTeam'].replace(takim_duzeltme)
         return df
     except: return None
 
-# --- ANALİZ MOTORU ---
-def analiz_motoru(ev, dep, df):
+# --- GELİŞMİŞ TAKTİK MOTORU ---
+def taktik_analiz(stats, taraf="Ev"):
+    gol_at = stats['FTHG'].mean() if taraf == "Ev" else stats['FTAG'].mean()
+    gol_ye = stats['FTAG'].mean() if taraf == "Ev" else stats['FTHG'].mean()
+    
+    # Oyun Karakteri Çıkarımı
+    stil = "Dengeli / Kontrollü"
+    dizilis = "4-4-2 (Klasik)"
+    
+    if gol_at > 2.0 and gol_ye < 1.0:
+        stil = "Dominant Hücum & Yüksek Pres"
+        dizilis = "4-3-3 (Ofansif)"
+    elif gol_at > 1.5 and gol_ye > 1.5:
+        stil = "Kaotik / Gol Düellocusu"
+        dizilis = "3-5-2 (Riskli)"
+    elif gol_at < 1.0 and gol_ye < 1.0:
+        stil = "Otobüs (Katı Savunma)"
+        dizilis = "5-4-1 (Defansif)"
+    elif gol_at < 1.0 and gol_ye > 1.5:
+        stil = "Kırılgan / Savunma Zaafiyeti"
+        dizilis = "4-5-1 (Direniş)"
+        
+    return stil, dizilis, gol_at, gol_ye
+
+# --- İLK YARI / İKİNCİ YARI ANALİZİ ---
+def yari_analizi(df, takim, taraf="Ev"):
+    # Takımın o taraftaki maçları
+    if taraf == "Ev":
+        maclar = df[df['HomeTeam'] == takim]
+        iy_gol = maclar['HTHG'].mean()
+        iy_yenen = maclar['HTAG'].mean()
+        ms_gol = maclar['FTHG'].mean()
+    else:
+        maclar = df[df['AwayTeam'] == takim]
+        iy_gol = maclar['HTAG'].mean()
+        iy_yenen = maclar['HTHG'].mean()
+        ms_gol = maclar['FTAG'].mean()
+        
+    iy_orani = (iy_gol / ms_gol) * 100 if ms_gol > 0 else 0
+    iy_karakter = "Hızlı Başlangıç" if iy_orani > 55 else ("İkinci Yarı Açılıyor" if iy_orani < 40 else "Dengeli Dağılım")
+    
+    return iy_gol, ms_gol - iy_gol, iy_karakter
+
+# --- ANA ANALİZ FONKSİYONU ---
+def detayli_analiz_motoru(ev, dep, df):
     ev_stats = df[df['HomeTeam'] == ev]
     dep_stats = df[df['AwayTeam'] == dep]
     if len(ev_stats) < 1 or len(dep_stats) < 1: return None
 
-    # İstatistikler
-    ev_gol_at = ev_stats['FTHG'].mean()
-    dep_gol_at = dep_stats['FTAG'].mean()
+    # 1. TAKTİK PROFİL
+    ev_stil, ev_dizilis, ev_g, ev_y = taktik_analiz(ev_stats, "Ev")
+    dep_stil, dep_dizilis, dep_g, dep_y = taktik_analiz(dep_stats, "Dep")
     
-    # Baskı Gücü
-    ev_baski = 50; dep_baski = 50
-    if 'HS' in df.columns:
-        ev_score = ev_stats['HS'].mean() + (ev_stats['HST'].mean() * 2)
-        dep_score = dep_stats['AS'].mean() + (dep_stats['AST'].mean() * 2)
-        toplam = ev_score + dep_score
-        ev_baski = (ev_score / toplam) * 100
-        dep_baski = (dep_score / toplam) * 100
-
-    # Korner
+    # 2. YARI ANALİZİ
+    ev_iy, ev_iy2, ev_karakter = yari_analizi(df, ev, "Ev")
+    dep_iy, dep_iy2, dep_karakter = yari_analizi(df, dep, "Dep")
+    
+    # 3. KORNER & KART (KAOS PUANI)
     ev_korner = ev_stats['HC'].mean() if 'HC' in df.columns else 4.5
     dep_korner = dep_stats['AC'].mean() if 'AC' in df.columns else 4.0
-    toplam_korner = ev_korner + dep_korner
+    ev_kart = ev_stats['HY'].mean() + ev_stats['AY'].mean() if 'HY' in df.columns else 2.0
+    dep_kart = dep_stats['HY'].mean() + dep_stats['AY'].mean() if 'HY' in df.columns else 2.0
     
-    # Tahminler
-    toplam_gol_beklenti = (ev_gol_at + dep_gol_at)
-    skor_ev = int(round(ev_gol_at * 1.15))
-    skor_dep = int(round(dep_gol_at * 0.9))
-    kg = "VAR" if (ev_gol_at > 0.7 and dep_gol_at > 0.7) else "YOK"
-    alt_ust = "2.5 ÜST" if toplam_gol_beklenti >= 2.4 else "2.5 ALT"
+    kaos_puani = (ev_g + dep_g + ev_kart + dep_kart) * 10 # 100 üzerinden
+    kaos_puani = min(100, kaos_puani)
     
-    fark = ev_baski - dep_baski
-    ibre = 50 + (fark / 1.5)
+    # 4. SKOR VE TAHMİN
+    xG_toplam = ev_g + dep_g
+    skor_ev = int(round(ev_g * 1.1))
+    skor_dep = int(round(dep_g * 0.9))
+    alt_ust = "2.5 ÜST" if xG_toplam >= 2.45 else "2.5 ALT"
+    kg = "VAR" if (ev_g > 0.75 and dep_g > 0.75) else "YOK"
+    
+    fark = (ev_g * 1.5 - ev_y) - (dep_g * 1.5 - dep_y)
+    ibre = 50 + (fark * 15)
     ibre = max(10, min(90, ibre))
     
     return {
-        "skor": f"{skor_ev} - {skor_dep}", "kg": kg, "alt_ust": alt_ust,
-        "ibre": ibre, "ev_baski": ev_baski, "dep_baski": dep_baski,
-        "ev_korner": ev_korner, "dep_korner": dep_korner, "toplam_korner": toplam_korner,
-        "ev_gol": ev_gol_at, "dep_gol": dep_gol_at
+        "ev": {"ad": ev, "stil": ev_stil, "dizilis": ev_dizilis, "iy": ev_iy, "iy2": ev_iy2, "karakter": ev_karakter},
+        "dep": {"ad": dep, "stil": dep_stil, "dizilis": dep_dizilis, "iy": dep_iy, "iy2": dep_iy2, "karakter": dep_karakter},
+        "mac": {"skor": f"{skor_ev}-{skor_dep}", "kg": kg, "alt_ust": alt_ust, "ibre": ibre, "kaos": kaos_puani, "korner": ev_korner+dep_korner}
     }
 
 # --- ARAYÜZ ---
-st.title("🦁 FUTBOL KAHİNİ V23")
+st.title("🦁 FUTBOL KAHİNİ: TACTICAL MASTERCLASS")
 
-tab_analiz, tab_puan, tab_live, tab_chat = st.tabs(["📊 DETAYLI ANALİZ", "🏆 PUAN DURUMU", "📺 CANLI SKOR", "🤖 ASİSTAN"])
+tab1, tab2, tab3 = st.tabs(["📊 ULTRA DETAYLI ANALİZ", "🏆 PUAN DURUMU", "🤖 ASİSTAN"])
 
-# ================= SEKME 1: HİBRİT ANALİZ =================
-with tab_analiz:
-    st.markdown("### 🕵️‍♂️ MAÇ ANALİZ MERKEZİ")
-    
-    c1, c2, c3 = st.columns([2,2,2])
+# ================= SEKME 1: ANALİZ =================
+with tab1:
+    # 1. SEÇİM EKRANI
+    c1, c2, c3 = st.columns([2, 2, 2])
     with c1: secilen_lig = st.selectbox("LİG SEÇİNİZ", list(lig_yapilandirma.keys()))
     df = veri_yukle(secilen_lig)
     
@@ -143,85 +178,102 @@ with tab_analiz:
         with c2: ev = st.selectbox("EV SAHİBİ", takimlar)
         with c3: dep = st.selectbox("DEPLASMAN", takimlar, index=1)
         
-        st.markdown("")
-        if st.button("DETAYLI ANALİZ ET 🚀"):
-            res = analiz_motoru(ev, dep, df)
+        # --- CANLI PENCERE (KÜÇÜLTÜLMÜŞ) ---
+        with st.expander("📡 Canlı Form Doğrulama (Tıkla Aç)", expanded=False):
+            st.markdown("<div class='live-small'>Flashscore Canlı Verisi (Teyit Amaçlı)</div>", unsafe_allow_html=True)
+            components.html(f"""<iframe src="{lig_yapilandirma[secilen_lig]['live']}" width="100%" height="300" frameborder="0" style="background:white;"></iframe>""", height=300)
+
+        if st.button("ANALİZ LABORATUVARINI ÇALIŞTIR 🧬"):
+            res = detayli_analiz_motoru(ev, dep, df)
             
             if res:
+                # --- BÖLÜM 1: MAÇ KİMLİĞİ VE TAHMİN ---
                 st.divider()
-                
-                # --- YENİ BÖLÜM: CANLI FORM DOĞRULAMA PENCERESİ ---
-                # CSV dosyaları gecikebilir, bu yüzden %100 doğru bilgi için canlı siteyi gömüyoruz.
-                st.markdown("<div class='live-header'>📡 CANLI FORM VE KADRO DOĞRULAMA (Flashscore Mobil)</div>", unsafe_allow_html=True)
-                st.caption("Veriler CSV dosyasından analiz edilir. %100 güncel son maçlar ve eksikler için aşağıdaki pencereyi kullanın.")
-                
-                # Mobil arayüz linki (Daha temiz görünür)
-                canli_link = lig_yapilandirma[secilen_lig]["live"]
-                components.html(f"""
-                <iframe src="{canli_link}" width="100%" height="400" frameborder="0" style="background-color: white; border-radius: 10px; border: 2px solid #00E676;"></iframe>
-                """, height=400)
-                
-                st.divider()
-
-                # --- YAPAY ZEKA TAHMİNLERİ ---
-                st.markdown("#### 🤖 YAPAY ZEKA TAHMİNLERİ")
                 k1, k2, k3, k4 = st.columns(4)
-                with k1: st.markdown(f"""<div class="stat-card"><div class="card-title">SKOR TAHMİNİ</div><div class="big-score">{res['skor']}</div></div>""", unsafe_allow_html=True)
-                with k2: st.markdown(f"""<div class="stat-card"><div class="card-title">KAZANMA ŞANSI</div><div class="big-score">% {res['ibre']:.0f}</div></div>""", unsafe_allow_html=True)
-                with k3: st.markdown(f"""<div class="stat-card"><div class="card-title">GOL BARAJI</div><div class="big-score" style="font-size:22px;">{res['alt_ust']}</div></div>""", unsafe_allow_html=True)
-                with k4: st.markdown(f"""<div class="stat-card"><div class="card-title">KG (KARŞILIKLI)</div><div class="big-score" style="font-size:22px;">{res['kg']}</div></div>""", unsafe_allow_html=True)
+                with k1: st.markdown(f"""<div class="metric-card"><div class="metric-title">SKOR TAHMİNİ</div><div class="metric-value">{res['mac']['skor']}</div></div>""", unsafe_allow_html=True)
+                with k2: st.markdown(f"""<div class="metric-card"><div class="metric-title">KAZANMA İHTİMALİ</div><div class="metric-value">% {res['mac']['ibre']:.0f}</div><div class="metric-sub">{res['ev']['ad']} Lehine</div></div>""", unsafe_allow_html=True)
+                with k3: st.markdown(f"""<div class="metric-card"><div class="metric-title">TOPLAM GOL</div><div class="metric-value">{res['mac']['alt_ust']}</div></div>""", unsafe_allow_html=True)
+                with k4: st.markdown(f"""<div class="metric-card"><div class="metric-title">KAOS PUANI (Kart+Gol)</div><div class="metric-value">{res['mac']['kaos']:.0f}/100</div></div>""", unsafe_allow_html=True)
+                
+                # --- BÖLÜM 2: TAKTİKSEL KİMLİK KARTLARI ---
+                st.markdown("### 🛡️ TAKTİKSEL KİMLİK KARTLARI")
+                t1, t2 = st.columns(2)
+                
+                with t1:
+                    st.markdown(f"""
+                    <div class="tactic-box" style="border-left: 4px solid #00E676;">
+                        <div class="tactic-header">{res['ev']['ad']} (Ev Sahibi)</div>
+                        <div class="tactic-text">
+                        • <b>Oyun Stili:</b> {res['ev']['stil']}<br>
+                        • <b>Önerilen Diziliş:</b> {res['ev']['dizilis']}<br>
+                        • <b>Maç Karakteri:</b> {res['ev']['karakter']}<br>
+                        • <b>Güçlü Yön:</b> İç saha baskısı ve erken goller.
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                with t2:
+                    st.markdown(f"""
+                    <div class="tactic-box" style="border-left: 4px solid #FF5252;">
+                        <div class="tactic-header">{res['dep']['ad']} (Deplasman)</div>
+                        <div class="tactic-text">
+                        • <b>Oyun Stili:</b> {res['dep']['stil']}<br>
+                        • <b>Önerilen Diziliş:</b> {res['dep']['dizilis']}<br>
+                        • <b>Maç Karakteri:</b> {res['dep']['karakter']}<br>
+                        • <b>Zayıf Yön:</b> Deplasman baskısını kırmakta zorlanabilirler.
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
-                # --- GRAFİKLER ---
+                # --- BÖLÜM 3: ZAMANLAMA VE GOL ANALİZİ (GRAFİKLER) ---
+                st.markdown("### ⏱️ GOL ZAMANLAMASI & PERFORMANS")
+                
                 g1, g2 = st.columns(2)
                 with g1:
-                    # Baskı Grafiği
-                    fig_baski = go.Figure()
-                    fig_baski.add_trace(go.Bar(y=[ev], x=[res['ev_baski']], orientation='h', name=ev, marker_color='#00E676'))
-                    fig_baski.add_trace(go.Bar(y=[dep], x=[res['dep_baski']], orientation='h', name=dep, marker_color='#FF5252'))
-                    fig_baski.update_layout(title="Baskı Gücü (Şut & İsabet)", barmode='stack', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font={'color':'white'}, height=250)
-                    st.plotly_chart(fig_baski, use_container_width=True)
+                    # Donut Chart: Ev Sahibi Gol Dağılımı
+                    labels = ['İlk Yarı Golleri', 'İkinci Yarı Golleri']
+                    values = [res['ev']['iy'], res['ev']['iy2']]
+                    fig_ev = go.Figure(data=[go.Pie(labels=labels, values=values, hole=.6, marker_colors=['#00E676', '#008f51'])])
+                    fig_ev.update_layout(title=f"{res['ev']['ad']} Gol Dağılımı", font=dict(color='white'), paper_bgcolor='rgba(0,0,0,0)')
+                    st.plotly_chart(fig_ev, use_container_width=True)
                 
                 with g2:
-                     # Radar
-                    categories = ['Hücum', 'Korner', 'Baskı', 'Gol Beklentisi']
-                    fig_radar = go.Figure()
-                    fig_radar.add_trace(go.Scatterpolar(r=[res['ev_gol']*20, res['ev_korner']*10, res['ev_baski'], res['ev_gol']*25], theta=categories, fill='toself', name=ev, line_color='#00E676'))
-                    fig_radar.add_trace(go.Scatterpolar(r=[res['dep_gol']*20, res['dep_korner']*10, res['dep_baski'], res['dep_gol']*25], theta=categories, fill='toself', name=dep, line_color='#FF5252'))
-                    fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font={'color':'white'}, height=250, margin=dict(t=20, b=20, l=20, r=20), title="Güç Dağılımı")
-                    st.plotly_chart(fig_radar, use_container_width=True)
-
-                # YORUM
+                    # Donut Chart: Deplasman Gol Dağılımı
+                    values_dep = [res['dep']['iy'], res['dep']['iy2']]
+                    fig_dep = go.Figure(data=[go.Pie(labels=labels, values=values_dep, hole=.6, marker_colors=['#FF5252', '#b33939'])])
+                    fig_dep.update_layout(title=f"{res['dep']['ad']} Gol Dağılımı", font=dict(color='white'), paper_bgcolor='rgba(0,0,0,0)')
+                    st.plotly_chart(fig_dep, use_container_width=True)
+                
+                # --- BÖLÜM 4: DETAYLI YORUMCU ANALİZİ ---
+                st.markdown("### 🎙️ YAPAY ZEKA TEKNİK ANALİZİ")
                 st.markdown(f"""
-                <div class="desc-box">
-                <b>💡 ANALİZ ÖZETİ:</b><br>
-                <b>{ev}</b> evinde baskın oynuyor (Baskı Gücü: {res['ev_baski']:.0f}). 
-                <b>{dep}</b> ise deplasmanlarda kontrollü. <br><br>
-                Yapay zeka bu maçta <b>{res['alt_ust']}</b> ve <b>{res['kg']}</b> seçeneklerini mantıklı buluyor.
+                <div class="tactic-box">
+                    <p><b>MAÇ SENARYOSU:</b><br>
+                    Veriler ışığında, <b>{res['ev']['ad']}</b> takımının {res['ev']['stil'].lower()} anlayışıyla maça hızlı başlaması muhtemel ({res['ev']['karakter']}). 
+                    Eğer ilk 30 dakikada gol bulurlarsa, <b>{res['dep']['ad']}</b> takımı risk alıp savunma arkasında boşluklar verebilir.</p>
+                    
+                    <p><b>KRİTİK BİLGİLER:</b><br>
+                    - Maçın kaos puanı <b>{res['mac']['kaos']:.0f}</b>. {('Kart ve penaltı ihtimali yüksek sert bir maç.' if res['mac']['kaos']>60 else 'Daha sakin, taktiksel bir maç.')}<br>
+                    - Beklenen toplam korner sayısı: <b>{res['mac']['korner']:.1f}</b>.</p>
+                    
+                    <p><b>SON SÖZ:</b><br>
+                    İbre <b>%{res['mac']['ibre']:.0f}</b> oranında {res['ev']['ad']} tarafını gösteriyor. 
+                    En mantıklı tercih <b>{res['mac']['alt_ust']}</b> ve <b>KG {res['mac']['kg']}</b> kombinasyonudur.</p>
                 </div>
                 """, unsafe_allow_html=True)
-            else: st.error("Veri yetersiz veya sezon başı.")
 
-# ================= SEKME 2: PUAN DURUMU (IFRAME) =================
-with tab_puan:
-    st.markdown(f"### 🏆 GÜNCEL PUAN DURUMU")
-    # Livescore masaüstü versiyonu puan durumu için daha iyidir
+            else: st.error("Sezon başı verisi eksik.")
+
+# ================= SEKME 2: PUAN DURUMU =================
+with tab2:
     link = "https://www.livescore.bz"
     components.html(f"""<iframe src="{link}" width="100%" height="800" frameborder="0" style="background-color: white; border-radius: 10px;"></iframe>""", height=800, scrolling=True)
 
-# ================= SEKME 3: CANLI SKOR =================
-with tab_live:
-    st.markdown("### 📺 CANLI MAÇ MERKEZİ")
-    components.html("""<iframe src="https://www.livescore.bz" width="100%" height="800" frameborder="0" style="background-color: white; border-radius: 8px;"></iframe>""", height=800, scrolling=True)
-
-# ================= SEKME 4: ASİSTAN =================
-with tab_chat:
-    st.markdown("### 🤖 ASİSTAN JARVIS")
+# ================= SEKME 3: ASİSTAN =================
+with tab3:
     if "messages" not in st.session_state: st.session_state.messages = [{"role": "assistant", "content": "Selam! Maçları sorabilirsin."}]
     for msg in st.session_state.messages: st.chat_message(msg["role"]).write(msg["content"])
     if prompt := st.chat_input("Mesaj yaz..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         st.chat_message("user").write(prompt)
-        cevap = "Analiz sekmesinden maçı seçip detaylara bakabilirsin."
-        if "naber" in prompt.lower(): cevap = "İyiyim, sen?"
-        st.chat_message("assistant").write(cevap)
-        st.session_state.messages.append({"role": "assistant", "content": cevap})
+        st.chat_message("assistant").write("Analiz sekmesinden detaylara bakabilirsin.")
