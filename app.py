@@ -7,7 +7,7 @@ import time
 # --- SAYFA AYARLARI ---
 st.set_page_config(page_title="Futbol Asistanı Pro", page_icon="⚽", layout="wide")
 
-# --- MODERN VE KARİZMATİK TASARIM ---
+# --- MODERN TASARIM ---
 st.markdown("""
 <style>
     .stApp { background-color: #0E1117; }
@@ -24,13 +24,12 @@ st.markdown("""
         box-shadow: 0px 4px 15px rgba(0, 204, 150, 0.4);
     }
     .stButton>button:hover { transform: scale(1.02); }
-    .metric-card { background-color: #1F2937; padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #374151; }
 </style>
 """, unsafe_allow_html=True)
 
 # --- BAŞLIK ---
 st.title("🦁 FUTBOL ASİSTANI PRO")
-st.markdown("<p style='text-align: center; color: gray;'>Yapay Zeka Destekli Bahis Analiz Platformu</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: gray;'>Yapay Zeka Destekli Analiz Platformu</p>", unsafe_allow_html=True)
 
 # --- 1. CANLI SKOR (GİZLENEBİLİR) ---
 with st.expander("🔴 CANLI MAÇLARI GÖSTER (Livescore)", expanded=False):
@@ -50,4 +49,8 @@ takim_duzeltme = {
 
 @st.cache_data(ttl=3600)
 def veri_getir(lig_kodu):
-    url = "
+    # HATA ÇIKARAN SATIRI BÖLDÜK (ARTIK GÜVENLİ)
+    if lig_kodu == "TR":
+        url = "https://www.football-data.co.uk/mmz4281/2425/T1.csv"
+    else:
+        url = "https
