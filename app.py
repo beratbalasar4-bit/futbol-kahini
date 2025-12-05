@@ -5,13 +5,14 @@ import plotly.graph_objects as go
 import time
 
 # --- SAYFA AYARLARI ---
-st.set_page_config(page_title="Futbol Asistanı Pro", page_icon="⚽", layout="wide")
+st.set_page_config(page_title="Futbol Kahini Global", page_icon="🌍", layout="wide")
 
-# --- TASARIM ---
+# --- TASARIM (KUPON GÖRÜNÜMÜ) ---
 st.markdown("""
 <style>
     .stApp { background-color: #0E1117; }
     h1 { color: #00CC96 !important; text-align: center; font-family: 'Arial Black', sans-serif; }
+    .kupon-karti { background-color: #1F2937; padding: 20px; border-radius: 15px; border-left: 10px solid #00CC96; margin-bottom: 20px; }
     .stButton>button { 
         background: linear-gradient(to right, #00CC96, #00b887); 
         color: white; width: 100%; border-radius: 12px; height: 55px; font-size: 20px; border: none;
@@ -20,7 +21,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- BAŞLIK ---
-st.title("🦁 FUTBOL ASİSTANI PRO")
+st.title("🌍 FUTBOL KAHİNİ GLOBAL")
+st.markdown("<p style='text-align: center; color: gray;'>7 Büyük Lig • Korner & Kart Analizi • Detaylı Tahmin</p>", unsafe_allow_html=True)
 
 # --- 1. CANLI SKOR ---
 with st.expander("🔴 CANLI MAÇLARI GÖSTER (Livescore)", expanded=False):
@@ -31,45 +33,47 @@ with st.expander("🔴 CANLI MAÇLARI GÖSTER (Livescore)", expanded=False):
 
 st.divider()
 
-# --- 2. VERİ MOTORU ---
+# --- 2. ÇOKLU LİG VERİ MOTORU ---
+lig_kodlari = {
+    "🇹🇷 Türkiye Süper Lig": "T1.csv",
+    "🇬🇧 İngiltere Premier Lig": "E0.csv",
+    "🇪🇸 İspanya La Liga": "SP1.csv",
+    "🇩🇪 Almanya Bundesliga": "D1.csv",
+    "🇮🇹 İtalya Serie A": "I1.csv",
+    "🇫🇷 Fransa Ligue 1": "F1.csv",
+    "🇳🇱 Hollanda Eredivisie": "N1.csv"
+}
+
+# İsim Düzeltme (Önemli Takımlar)
 takim_duzeltme = {
-    "Fenerbahce": "Fenerbahçe", "Galatasaray": "Galatasaray", "Besiktas": "Beşiktaş",
-    "Trabzonspor": "Trabzonspor", "Buyuksehyr": "Başakşehir FK", "Man City": "Manchester City",
-    "Man United": "Manchester United", "Liverpool": "Liverpool", "Arsenal": "Arsenal", "Chelsea": "Chelsea"
+    "Fenerbahce": "Fenerbahçe", "Galatasaray": "Galatasaray", "Besiktas": "Beşiktaş", "Trabzonspor": "Trabzonspor",
+    "Buyuksehyr": "Başakşehir FK", "Man City": "Manchester City", "Man United": "Manchester United",
+    "Real Madrid": "Real Madrid", "Barcelona": "Barcelona", "Bayern Munich": "Bayern Münih",
+    "Paris SG": "PSG", "Inter": "Inter Milan", "Milan": "AC Milan", "Juventus": "Juventus"
 }
 
 @st.cache_data(ttl=3600)
-def veri_getir(lig_kodu):
-    # --- HATA ÇÖZÜMÜ (KISA PARÇALAR) ---
-    # Linki bilerek kisa kisa yaziyoruz ki kopyalarken bozulmasin
-    site = "https://www.football-data.co.uk"
-    klasor = "/mmz4281/2425/"
+def veri_getir(secilen_lig):
+    dosya_adi = lig_kodlari[secilen_lig]
     
-    if lig_kodu == "TR":
-        dosya = "T1.csv"
-    else:
-        dosya = "E0.csv"
-    
-    # Parcalari birlestir
-    url = site + klasor + dosya
+    # URL BÖLME TEKNİĞİ (Hata Vermesin Diye)
+    ana_url = "https://www.football-data.co.uk/mmz4281/2425/"
+    full_url = ana_url + dosya_adi
     
     try:
-        df = pd.read_csv(url)
+        df = pd.read_csv(full_url)
         df = df.dropna(subset=['FTR'])
+        # Varsa isimleri düzelt
         df['HomeTeam'] = df['HomeTeam'].replace(takim_duzeltme)
         df['AwayTeam'] = df['AwayTeam'].replace(takim_duzeltme)
         return df
     except: return None
 
-# --- ARAYÜZ ---
-st.subheader("🧠 YAPAY ZEKA KAHİNİ")
+# --- SEÇİM EKRANI ---
+st.subheader("🏆 DETAYLI ANALİZ MASASI")
 
-lig_secimi = st.selectbox("Ligi Seçiniz:", ["Türkiye Süper Lig", "İngiltere Premier Lig"])
-
-if lig_secimi == "Türkiye Süper Lig":
-    df = veri_getir("TR")
-else:
-    df = veri_getir("EN")
+secilen_lig = st.selectbox("Ligi Seçiniz:", list(lig_kodlari.keys()))
+df = veri_getir(secilen_lig)
 
 if df is not None:
     takimlar = sorted(df['HomeTeam'].unique())
@@ -79,49 +83,109 @@ if df is not None:
 
     st.write("")
     
-    if st.button("MAÇI ANALİZ ET 🚀"):
-        with st.spinner('Veriler Taranıyor...'):
-            time.sleep(0.5)
+    if st.button("DETAYLI KUPON OLUŞTUR 🚀"):
+        with st.spinner('Kornerler, Kartlar ve Goller Hesaplanıyor...'):
+            time.sleep(1) # Analiz süsü
             
             ev_stats = df[df['HomeTeam'] == ev]
             dep_stats = df[df['AwayTeam'] == dep]
 
-            if len(ev_stats) > 0:
-                # Güç Formülü
-                ev_guc = (ev_stats['FTHG'].mean() * 35) + 25
-                ev_def = 100 - (ev_stats['FTAG'].mean() * 30)
-                dep_guc = (dep_stats['FTAG'].mean() * 35) + 25
-                dep_def = 100 - (dep_stats['FTHG'].mean() * 30)
+            if len(ev_stats) > 0 and len(dep_stats) > 0:
+                # --- HESAPLAMA MOTORU ---
                 
-                # İbre Hesabı
-                ev_toplam = ev_guc + ev_def
-                dep_toplam = dep_guc + dep_def
-                fark = ev_toplam - dep_toplam
-                ibre = 50 + (fark / 1.5)
-                ibre = max(5, min(95, ibre))
+                # 1. Gol Beklentisi
+                ev_gol_ort = (ev_stats['FTHG'].mean() + ev_stats['FTAG'].mean()) / 2
+                dep_gol_ort = (dep_stats['FTHG'].mean() + dep_stats['FTAG'].mean()) / 2
+                mac_gol_beklentisi = (ev_gol_ort + dep_gol_ort)
+                
+                # 2. Korner Beklentisi (Eğer veri varsa)
+                if 'HC' in df.columns:
+                    ev_korner = ev_stats['HC'].mean() + ev_stats['AC'].mean() # Evindeyken maç başı korner
+                    dep_korner = dep_stats['HC'].mean() + dep_stats['AC'].mean() # Deplasmanda maç başı korner
+                    toplam_korner = (ev_korner + dep_korner) / 2
+                else:
+                    toplam_korner = 9.5 # Varsayılan
+                
+                # 3. Kart/Sertlik (Eğer veri varsa)
+                if 'HY' in df.columns:
+                    ev_kart = ev_stats['HY'].mean() + ev_stats['AY'].mean() # Sarı Kart
+                    dep_kart = dep_stats['HY'].mean() + dep_stats['AY'].mean()
+                    toplam_kart = (ev_kart + dep_kart) / 2
+                else:
+                    toplam_kart = 4.5
+
+                # 4. Galibiyet İbresi
+                ev_puan = (ev_stats['FTHG'].mean() * 40) - (ev_stats['FTAG'].mean() * 20)
+                dep_puan = (dep_stats['FTAG'].mean() * 40) - (dep_stats['FTHG'].mean() * 20)
+                fark = ev_puan - dep_puan
+                ibre = 50 + (fark / 2)
+                ibre = max(10, min(90, ibre))
+
+                # --- SONUÇ KARTI (GÖRSEL) ---
+                st.markdown(f"""
+                <div class="kupon-karti">
+                    <h2 style="text-align:center; color:white;">MAÇ RAPORU</h2>
+                    <h3 style="text-align:center; color:#00CC96;">{ev} vs {dep}</h3>
+                    <hr>
+                </div>
+                """, unsafe_allow_html=True)
+
+                # Kolonlar
+                k1, k2, k3, k4 = st.columns(4)
+                
+                # K1: KAZANAN
+                with k1:
+                    st.info("🏆 MAÇ SONUCU")
+                    if ibre > 60: st.markdown(f"**{ev}** (MS 1)")
+                    elif ibre < 40: st.markdown(f"**{dep}** (MS 2)")
+                    else: st.markdown("**BERABERLİK** (MS 0)")
+                
+                # K2: GOL (ALT/ÜST)
+                with k2:
+                    st.warning("⚽ GOL TAHMİNİ")
+                    if mac_gol_beklentisi > 2.6: st.markdown("**2.5 ÜST** (Bol Gol)")
+                    elif mac_gol_beklentisi < 2.1: st.markdown("**2.5 ALT** (Kısır)")
+                    else: st.markdown("**2-3 GOL**")
+                
+                # K3: KORNER
+                with k3:
+                    st.success("⛳ KORNER")
+                    st.markdown(f"Beklenti: **{toplam_korner:.1f}**")
+                    if toplam_korner > 9.5: st.caption("9.5 ÜST Olabilir")
+                    else: st.caption("Korner Az Olur")
+                
+                # K4: KART
+                with k4:
+                    st.error("🟨 KART / SERTLİK")
+                    st.markdown(f"Ort. Kart: **{toplam_kart:.1f}**")
+                    if toplam_kart > 4.5: st.caption("Sert Maç (Kart Var)")
+                    else: st.caption("Temiz Maç")
+
+                st.divider()
 
                 # --- GRAFİKLER ---
-                categories = ['Hücum', 'Defans', 'Form', 'Şut', 'Motivasyon']
-                fig = go.Figure()
-                fig.add_trace(go.Scatterpolar(r=[ev_guc, ev_def, ev_guc-5, ev_guc+5, ev_guc], theta=categories, fill='toself', name=ev, line_color='#00CC96'))
-                fig.add_trace(go.Scatterpolar(r=[dep_guc, dep_def, dep_guc-5, dep_guc+5, dep_guc], theta=categories, fill='toself', name=dep, line_color='#FF4B4B'))
-                fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), template="plotly_dark", title="Güç Analizi")
+                g1, g2 = st.columns([2, 1])
+                
+                with g1:
+                    # Radar Grafik
+                    categories = ['Hücum', 'Defans', 'Korner Gücü', 'Sertlik', 'Form']
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatterpolar(r=[ev_puan, 80, toplam_korner*8, toplam_kart*15, ev_puan], theta=categories, fill='toself', name=ev, line_color='#00CC96'))
+                    fig.add_trace(go.Scatterpolar(r=[dep_puan, 60, toplam_korner*7, toplam_kart*15, dep_puan], theta=categories, fill='toself', name=dep, line_color='#FF4B4B'))
+                    fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), template="plotly_dark", title="Detaylı Takım Analizi")
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                with g2:
+                    # İbre
+                    fig_gauge = go.Figure(go.Indicator(
+                        mode = "gauge+number", value = ibre,
+                        title = {'text': "Kazanma Şansı %"},
+                        gauge = {'axis': {'range': [0, 100]}, 'bar': {'color': "white"}, 'steps': [{'range': [0, 45], 'color': "#FF4B4B"}, {'range': [45, 55], 'color': "gray"}, {'range': [55, 100], 'color': "#00CC96"}]}
+                    ))
+                    fig_gauge.update_layout(height=300, margin=dict(t=50,b=20,l=20,r=20))
+                    st.plotly_chart(fig_gauge, use_container_width=True)
 
-                fig_gauge = go.Figure(go.Indicator(
-                    mode = "gauge+number", value = ibre,
-                    title = {'text': "Kazanma İhtimali (%)"},
-                    gauge = {'axis': {'range': [0, 100]}, 'bar': {'color': "white"}, 'steps': [{'range': [0, 45], 'color': "#FF4B4B"}, {'range': [45, 55], 'color': "gray"}, {'range': [55, 100], 'color': "#00CC96"}]}
-                ))
-                fig_gauge.update_layout(height=250, margin=dict(t=30,b=10,l=20,r=20))
-
-                c1, c2 = st.columns(2)
-                with c1: st.plotly_chart(fig, use_container_width=True)
-                with c2: st.plotly_chart(fig_gauge, use_container_width=True)
-
-                if ibre > 55: st.success(f"✅ **BANKO:** {ev} kazanmaya yakın!")
-                elif ibre < 45: st.error(f"⚠️ **SÜRPRİZ:** {dep} kazanabilir!")
-                else: st.warning("💣 **RİSK:** Beraberlik ihtimali yüksek.")
             else:
-                st.error("Veri yok.")
+                st.error("Veri yetersiz veya sezon başı.")
 else:
-    st.warning("Veriler yükleniyor...")
+    st.info("Veriler İngiltere sunucularından çekiliyor...")
