@@ -7,13 +7,10 @@ import datetime
 # --- SAYFA AYARLARI ---
 st.set_page_config(page_title="Futbol Kahini Pro", page_icon="⚽", layout="wide")
 
-# --- CSS (NEON VE DETAYLI TASARIM) ---
+# --- CSS (NEON TASARIM) ---
 st.markdown("""
 <style>
-    /* Ana Arka Plan */
     .stApp { background-color: #0E1117; color: #E0E0E0; }
-    
-    /* Başlıklar */
     h1, h2, h3, h4 { color: #00E676 !important; font-family: 'Arial Black', sans-serif; text-transform: uppercase; letter-spacing: 1px; }
     
     /* SEÇİM KUTULARI */
@@ -22,16 +19,16 @@ st.markdown("""
     div[data-baseweb="select"] span { color: #00E676 !important; font-weight: bold !important; font-size: 16px !important; }
     div[data-baseweb="select"] svg { fill: #00E676 !important; }
     
-    /* İstatistik Kartları */
+    /* KART TASARIMLARI */
     .stat-card { background-color: #1F2937; padding: 15px; border-radius: 10px; border: 1px solid #374151; text-align: center; margin-bottom: 10px; box-shadow: 0 4px 10px rgba(0, 230, 118, 0.1); }
     .big-score { font-size: 28px; font-weight: bold; color: #00E676; margin: 5px 0; text-shadow: 0 0 10px rgba(0,230,118,0.5); }
     .card-title { font-size: 13px; color: #B0BEC5; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; }
     
-    /* Form Kutucukları (G/B/M) */
-    .form-badge { display: inline-block; width: 35px; height: 35px; line-height: 35px; text-align: center; border-radius: 5px; font-weight: bold; color: white; margin-right: 5px; font-size: 14px; }
-    .win { background-color: #00E676; color: black; }
-    .draw { background-color: #9E9E9E; }
-    .loss { background-color: #FF5252; }
+    /* FORM KUTUCUKLARI (DÜZELTİLDİ) */
+    .form-badge { display: inline-block; width: 40px; height: 40px; line-height: 40px; text-align: center; border-radius: 8px; font-weight: bold; color: white; margin-right: 5px; font-size: 16px; border: 1px solid rgba(255,255,255,0.2); }
+    .win { background-color: #00E676; color: black; box-shadow: 0 0 10px #00E676; }
+    .draw { background-color: #757575; color: white; }
+    .loss { background-color: #FF5252; color: white; box-shadow: 0 0 5px #FF5252; }
     
     /* Açıklama Kutusu */
     .desc-box { background-color: #263238; border-left: 4px solid #00E676; padding: 15px; border-radius: 5px; font-size: 14px; line-height: 1.5; color: white !important; }
@@ -45,7 +42,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- LİNKLER (PUAN DURUMU İÇİN CANLI LİNKLER) ---
+# --- VERİ SETLERİ ---
 standings_urls = {
     "🇹🇷 Türkiye Süper Lig": "https://www.livescore.bz/en/football/turkey/super-lig/standings/",
     "🇬🇧 İngiltere Premier": "https://www.livescore.bz/en/football/england/premier-league/standings/",
@@ -57,7 +54,6 @@ standings_urls = {
     "🇵🇹 Portekiz Liga NOS": "https://www.livescore.bz/en/football/portugal/primeira-liga/standings/"
 }
 
-# --- VERİ SETLERİ (ANALİZ İÇİN CSV) ---
 lig_kodlari = {
     "🇹🇷 Türkiye Süper Lig": "T1.csv", "🇬🇧 İngiltere Premier": "E0.csv", 
     "🇪🇸 İspanya La Liga": "SP1.csv", "🇩🇪 Almanya Bundesliga": "D1.csv", 
@@ -73,7 +69,7 @@ takim_duzeltme = {
     "Benfica": "Benfica", "Porto": "Porto", "Ajax": "Ajax"
 }
 
-# --- VERİ YÜKLEME ---
+# --- VERİ YÜKLEME VE TARİH DÜZELTME ---
 @st.cache_data(ttl=3600)
 def veri_yukle(lig_ad):
     ana_url = "https://www.football-data.co.uk/mmz4281/2425/" 
@@ -82,27 +78,54 @@ def veri_yukle(lig_ad):
         url = ana_url + dosya
         df = pd.read_csv(url)
         df = df.dropna(subset=['FTR'])
+        
+        # --- TARİH DÜZELTME (ÖNEMLİ KISIM) ---
+        # Tarih sütununu gerçek tarih formatına çeviriyoruz ki sıralama doğru olsun
+        df['Date'] = pd.to_datetime(df['Date'], dayfirst=True, errors='coerce')
+        df = df.sort_values(by='Date') # Eskiden yeniye sırala
+        
         df['HomeTeam'] = df['HomeTeam'].replace(takim_duzeltme)
         df['AwayTeam'] = df['AwayTeam'].replace(takim_duzeltme)
         return df
     except: return None
 
-# --- FORM HESAPLAMA (SON 5 MAÇ) ---
+# --- FORM HESAPLAMA (DOĞRU MANTIK) ---
 def form_getir(takim, df):
-    # Takımın son 5 maçını bul
-    maclar = df[(df['HomeTeam'] == takim) | (df['AwayTeam'] == takim)].tail(5)
-    sonuclar = []
+    # Takımın olduğu maçları filtrele
+    takim_maclari = df[(df['HomeTeam'] == takim) | (df['AwayTeam'] == takim)]
     
-    for _, row in maclar.iterrows():
+    # Tarihe göre sırala ve son 5 maçı al
+    son_5_mac = takim_maclari.sort_values(by='Date', ascending=True).tail(5)
+    
+    sonuclar = []
+    detaylar = [] # Tooltip için (Kimi yendi?)
+    
+    for _, row in son_5_mac.iterrows():
+        # Eğer takım EV SAHİBİ ise
         if row['HomeTeam'] == takim:
-            if row['FTR'] == 'H': sonuclar.append("G")
-            elif row['FTR'] == 'D': sonuclar.append("B")
-            else: sonuclar.append("M")
-        else: # Deplasman
-            if row['FTR'] == 'A': sonuclar.append("G")
-            elif row['FTR'] == 'D': sonuclar.append("B")
-            else: sonuclar.append("M")
-    return sonuclar
+            rakip = row['AwayTeam']
+            skor = f"{int(row['FTHG'])}-{int(row['FTAG'])}"
+            if row['FTR'] == 'H': 
+                sonuclar.append("G") # Home kazandı -> Galibiyet
+            elif row['FTR'] == 'D': 
+                sonuclar.append("B")
+            else: 
+                sonuclar.append("M") # Home kaybetti -> Mağlubiyet
+        
+        # Eğer takım DEPLASMAN ise
+        else:
+            rakip = row['HomeTeam']
+            skor = f"{int(row['FTHG'])}-{int(row['FTAG'])}"
+            if row['FTR'] == 'A': 
+                sonuclar.append("G") # Away kazandı -> Galibiyet
+            elif row['FTR'] == 'D': 
+                sonuclar.append("B")
+            else: 
+                sonuclar.append("M") # Away kaybetti -> Mağlubiyet
+                
+        detaylar.append(f"vs {rakip} ({skor})")
+        
+    return sonuclar, detaylar
 
 # --- ANALİZ MOTORU ---
 def analiz_motoru(ev, dep, df):
@@ -116,7 +139,7 @@ def analiz_motoru(ev, dep, df):
     ev_gol_ye = ev_stats['FTAG'].mean()
     dep_gol_ye = dep_stats['FTHG'].mean()
     
-    # Baskı (Şut)
+    # Baskı
     ev_baski = 50; dep_baski = 50
     if 'HS' in df.columns:
         ev_score = ev_stats['HS'].mean()
@@ -155,7 +178,7 @@ def analiz_motoru(ev, dep, df):
     }
 
 # --- ARAYÜZ ---
-st.title("🦁 FUTBOL KAHİNİ V21")
+st.title("🦁 FUTBOL KAHİNİ PRO V22")
 
 tab_analiz, tab_puan, tab_live, tab_chat = st.tabs(["📊 DETAYLI ANALİZ", "🏆 PUAN DURUMU", "📺 CANLI SKOR", "🤖 ASİSTAN"])
 
@@ -163,7 +186,6 @@ tab_analiz, tab_puan, tab_live, tab_chat = st.tabs(["📊 DETAYLI ANALİZ", "�
 with tab_analiz:
     st.markdown("### 🕵️‍♂️ MAÇ ANALİZ MERKEZİ")
     
-    # 1. SEÇİM
     c1, c2, c3 = st.columns([2,2,2])
     with c1: secilen_lig = st.selectbox("LİG SEÇİNİZ", list(lig_kodlari.keys()))
     df = veri_yukle(secilen_lig)
@@ -180,26 +202,33 @@ with tab_analiz:
             if res:
                 st.divider()
                 
-                # --- KISIM 1: SON 5 MAÇ (FORM DURUMU) ---
+                # --- KISIM 1: SON 5 MAÇ (DÜZELTİLMİŞ) ---
                 st.markdown("#### 📈 TAKIMLARIN FORM DURUMU")
+                st.caption("(Takımların oynadığı en son 5 resmi maçın sonucudur)")
                 f1, f2 = st.columns(2)
                 
-                ev_form = form_getir(ev, df)
-                dep_form = form_getir(dep, df)
+                ev_sonuc, ev_detay = form_getir(ev, df)
+                dep_sonuc, dep_detay = form_getir(dep, df)
                 
-                def form_html(liste):
+                def form_html(liste, detaylar):
                     html = ""
-                    for x in liste:
+                    # Listeyi tersten yazdıralım ki En son maç en sağda olsun (veya solda, tercih meselesi. Genelde soldan sağa: Eski -> Yeni)
+                    # Biz Yeni -> Eski yapalım ya da olduğu gibi bırakalım.
+                    for i, x in enumerate(liste):
                         renk = "win" if x == "G" else ("loss" if x == "M" else "draw")
-                        html += f"<div class='form-badge {renk}'>{x}</div>"
+                        # Tooltip (Mouse üstüne gelince detay) eklenebilir ama basit HTML'de zor.
+                        # Basitçe kutuları yazdıralım.
+                        html += f"<div class='form-badge {renk}' title='{detaylar[i]}'>{x}</div>"
                     return html
                 
                 with f1:
-                    st.markdown(f"**{ev} (Son 5 Maç):**")
-                    st.markdown(form_html(ev_form), unsafe_allow_html=True)
+                    st.markdown(f"**{ev} Formu:**")
+                    st.markdown(form_html(ev_sonuc, ev_detay), unsafe_allow_html=True)
+                    st.caption(f"Son maç: {ev_detay[-1]}") # En son maçı alta yazı olarak ekledim
                 with f2:
-                    st.markdown(f"**{dep} (Son 5 Maç):**")
-                    st.markdown(form_html(dep_form), unsafe_allow_html=True)
+                    st.markdown(f"**{dep} Formu:**")
+                    st.markdown(form_html(dep_sonuc, dep_detay), unsafe_allow_html=True)
+                    st.caption(f"Son maç: {dep_detay[-1]}")
                 
                 st.divider()
 
@@ -210,12 +239,11 @@ with tab_analiz:
                 with k3: st.markdown(f"""<div class="stat-card"><div class="card-title">GOL BARAJI</div><div class="big-score" style="font-size:22px;">{res['alt_ust']}</div></div>""", unsafe_allow_html=True)
                 with k4: st.markdown(f"""<div class="stat-card"><div class="card-title">KG (KARŞILIKLI)</div><div class="big-score" style="font-size:22px;">{res['kg']}</div></div>""", unsafe_allow_html=True)
 
-                # --- KISIM 3: İSTATİSTİK KARŞILAŞTIRMA (Bar Chart) ---
+                # --- KISIM 3: İSTATİSTİK KARŞILAŞTIRMA ---
                 st.markdown("#### ⚔️ İSTATİSTİK SAVAŞI")
                 g1, g2 = st.columns(2)
                 
                 with g1:
-                    # Gol Atma/Yeme Grafiği
                     fig_stats = go.Figure(data=[
                         go.Bar(name='Gol Atma Ort.', x=[ev, dep], y=[res['ev_gol'], res['dep_gol']], marker_color='#00E676'),
                         go.Bar(name='Gol Yeme Ort.', x=[ev, dep], y=[res['ev_yed'], res['dep_yed']], marker_color='#FF5252')
@@ -224,7 +252,6 @@ with tab_analiz:
                     st.plotly_chart(fig_stats, use_container_width=True)
                 
                 with g2:
-                    # Korner/Kart Grafiği
                     fig_kk = go.Figure(data=[
                         go.Bar(name='Korner', x=[ev, dep], y=[res['ev_korner'], res['dep_korner']], marker_color='#F1C40F'),
                         go.Bar(name='Kart/Sertlik', x=[ev, dep], y=[res['kart'], res['kart']], marker_color='#9E9E9E') 
@@ -235,37 +262,31 @@ with tab_analiz:
                 # --- KISIM 4: RADAR VE BASKI ---
                 r1, r2 = st.columns([1, 1])
                 with r1:
-                    # Radar
                     categories = ['Hücum', 'Korner', 'Baskı', 'Gol Beklentisi']
                     fig_radar = go.Figure()
                     fig_radar.add_trace(go.Scatterpolar(r=[res['ev_gol']*20, res['ev_korner']*10, res['ev_baski'], res['ev_gol']*25], theta=categories, fill='toself', name=ev, line_color='#00E676'))
                     fig_radar.add_trace(go.Scatterpolar(r=[res['dep_gol']*20, res['dep_korner']*10, res['dep_baski'], res['dep_gol']*25], theta=categories, fill='toself', name=dep, line_color='#FF5252'))
-                    fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font={'color':'white'}, height=250, margin=dict(t=30, b=20, l=20, r=20), title="Güç Dağılımı")
+                    fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font={'color':'white'}, height=250, margin=dict(t=20, b=20, l=20, r=20), title="Güç Dağılımı")
                     st.plotly_chart(fig_radar, use_container_width=True)
                 
                 with r2:
                      st.markdown(f"""
                      <div class="desc-box" style="margin-top: 50px;">
                      <b>🤖 YAPAY ZEKA YORUMU:</b><br><br>
-                     Verilere baktığımda <b>{ev}</b> takımının evindeki baskı gücü %{res['ev_baski']:.0f} seviyesinde. 
-                     <b>{dep}</b> ise deplasmanda ortalama {res['dep_gol']:.1f} gol atabiliyor.<br><br>
-                     Maçın <b>{res['alt_ust']}</b> bitme ihtimali yüksek. Kornerlerde ise toplam {res['toplam_korner']:.1f} barajı zorlanabilir.
+                     <b>{ev}</b> son maçlarında {ev_sonuc[-1] if ev_sonuc else 'B'} form grafiği çiziyor.
+                     Evindeki baskı gücü %{res['ev_baski']:.0f}.<br>
+                     <b>{dep}</b> ise deplasmanda ortalama {res['dep_gol']:.1f} gol atıyor.<br><br>
+                     Genel görüşüm: Maçın <b>{res['alt_ust']}</b> bitme ihtimali yüksek.
                      </div>
                      """, unsafe_allow_html=True)
 
-            else: st.error("Veri yetersiz.")
+            else: st.error("Sezon başı olduğu için veri yetersiz.")
 
-# ================= SEKME 2: PUAN DURUMU (IFRAME İLE KESİN ÇÖZÜM) =================
+# ================= SEKME 2: PUAN DURUMU (IFRAME) =================
 with tab_puan:
     st.markdown(f"### 🏆 GÜNCEL PUAN DURUMU")
-    
-    # Seçilen lige göre doğru linki getir
     link = standings_urls.get(secilen_lig, "https://www.livescore.bz")
-    
-    # Iframe ile canlı siteyi gömüyoruz
-    components.html(f"""
-    <iframe src="{link}" width="100%" height="800" frameborder="0" style="background-color: white; border-radius: 10px;"></iframe>
-    """, height=800, scrolling=True)
+    components.html(f"""<iframe src="{link}" width="100%" height="800" frameborder="0" style="background-color: white; border-radius: 10px;"></iframe>""", height=800, scrolling=True)
 
 # ================= SEKME 3: CANLI SKOR =================
 with tab_live:
