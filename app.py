@@ -17,11 +17,7 @@ st.markdown("""
     .stApp { background-color: #050505; color: #E0E0E0; }
     h1, h2, h3, h4 { color: #00E676 !important; font-family: 'Arial Black', sans-serif; text-transform: uppercase; letter-spacing: 1px; }
     
-    /* SEÇİM KUTULARI */
-    .stSelectbox label p { font-size: 16px !important; color: #00E676 !important; font-weight: bold; }
-    div[data-baseweb="select"] > div { background-color: #121212 !important; border: 1px solid #00E676 !important; color: white !important; }
-
-    /* KARTLAR */
+    /* ANALİZ KUTULARI */
     .metric-card {
         background: linear-gradient(145deg, #1a1a1a, #121212);
         padding: 15px; border-radius: 10px; border-left: 5px solid #00E676;
@@ -47,15 +43,7 @@ st.markdown("""
 
 # --- VERİ VE FONKSİYON YAPILANDIRMASI ---
 
-# YENİ GENİŞLETİLMİŞ GÜNCEL TAKIM LİSTELERİ (5.12.2025 Simülasyonu)
-GUNCEL_TAKIMLAR = {
-    "🇹🇷 Türkiye Süper Lig": ["Fenerbahçe", "Galatasaray", "Beşiktaş", "Trabzonspor", "Başakşehir", "Kasımpaşa", "Kocaelispor", "Konyaspor", "Kayserispor", "Gaziantep", "Sivasspor", "Alanyaspor", "Antalyaspor", "Hatayspor", "Adana Demirspor", "Samsunspor", "Göztepe", "Eyüpspor"],
-    "🇬🇧 İngiltere Premier": ["Man City", "Arsenal", "Liverpool", "Aston Villa", "Tottenham", "Chelsea", "Man Utd", "Newcastle", "West Ham", "Leicester", "Ipswich", "Southampton", "Crystal Palace", "Wolves", "Bournemouth", "Fulham", "Everton", "Brighton"],
-    "🇩🇪 Almanya Bundesliga": ["Bayern Munich", "Dortmund", "Leverkusen", "Stuttgart", "RB Leipzig", "Eintracht Frankfurt", "Hoffenheim", "Freiburg", "Augsburg", "Werder Bremen", "Wolfsburg", "Mainz", "Union Berlin", "Bochum", "Heidenheim", "Holstein Kiel", "St. Pauli", "Fortuna Düsseldorf"],
-    "🇪🇸 İspanya La Liga": ["R. Madrid", "Barcelona", "Girona", "Atl. Madrid", "Athletic Club", "Real Sociedad", "Betis", "Valencia", "Villarreal", "Getafe", "Alavés", "Sevilla", "Osasuna", "Celta Vigo", "Rayo Vallecano", "Mallorca", "Leganés", "Valladolid"],
-    "🇵🇹 Portekiz Liga NOS": ["Benfica", "Porto", "Sporting CP", "Braga", "Vitoria Guimaraes", "Arouca", "Rio Ave", "Moreirense", "Farense", "Estrela Amadora", "Gil Vicente", "Boavista", "Estoril", "Vizela", "Chaves", "Académico Viseu", "Penafiel", "Marítimo"]
-}
-
+# LİG YAPILANDIRMASI (Hafifletilmiş ve Genişletilmiş)
 lig_yapilandirma = {
     "🇹🇷 Türkiye Süper Lig": {"csv": "T1.csv", "live": "https://www.flashscore.mobi/standings/W6BOzpK2/U3MvIVsA/#table/overall"},
     "🇬🇧 İngiltere Premier": {"csv": "E0.csv", "live": "https://www.flashscore.mobi/standings/dYlOSQ44/W6DOvJ92/#table/overall"},
@@ -63,7 +51,9 @@ lig_yapilandirma = {
     "🇩🇪 Almanya Bundesliga": {"csv": "D1.csv", "live": "https://www.flashscore.mobi/standings/W6BOzpK2/U3MvIVsA/#table/overall"},
     "🇮🇹 İtalya Serie A": {"csv": "I1.csv", "live": "https://www.flashscore.mobi/standings/dYlOSQ44/W6DOvJ92/#table/overall"},
     "🇫🇷 Fransa Ligue 1": {"csv": "F1.csv", "live": "https://www.flashscore.mobi/standings/W6BOzpK2/U3MvIVsA/#table/overall"},
-    "🇵🇹 Portekiz Liga NOS": {"csv": "P1.csv", "live": "https://www.flashscore.mobi"}
+    "🇵🇹 Portekiz Liga NOS": {"csv": "P1.csv", "live": "https://www.flashscore.mobi"},
+    "🇧🇪 Belçika Jupiler": {"csv": "B1.csv", "live": "https://www.flashscore.mobi"},
+    "🇬🇷 Yunanistan Süper Lig": {"csv": "G1.csv", "live": "https://www.flashscore.mobi"}
 }
 
 takim_duzeltme = {
@@ -72,7 +62,6 @@ takim_duzeltme = {
     "Bayern Munich": "Bayern Munich", "Dortmund": "Dortmund", "Kocaeli": "Kocaelispor", "Eyup": "Eyüpspor"
 }
 
-# HATA DÜZELTME: Güvenli Ortalama Alma
 def get_safe_mean(df_slice, col_name, default=0.0):
     if col_name in df_slice.columns:
         mean_val = df_slice[col_name].mean()
@@ -94,9 +83,7 @@ def veri_yukle(lig_ad):
         df['HomeTeam'] = df['HomeTeam'].replace(takim_duzeltme)
         df['AwayTeam'] = df['AwayTeam'].replace(takim_duzeltme)
         
-        # GÜNCEL TAKIM FİLTRESİ
-        current_teams = GUNCEL_TAKIMLAR.get(lig_ad, df['HomeTeam'].unique())
-        df = df[df['HomeTeam'].isin(current_teams) & df['AwayTeam'].isin(current_teams)]
+        # TAKIM LİSTESİ FİLTRESİ KALDIRILDI: Tüm veriyi kullanıyoruz.
         
         return df
     except: return None
@@ -111,19 +98,19 @@ def raw_data_hesapla(df):
         away = df[df['AwayTeam'] == team]
         O = len(home) + len(away)
         
-        # Hata Düzeltme: Oynanan maç 0 ise, ortalama 0 olmalı.
         if O == 0: continue
         
         avg_data = {"Takım": team, "Oynanan Maç": O}
         
+        # Ortalama alma
         avg_data["Gol Ort."] = (home['FTHG'].sum() + away['FTAG'].sum()) / O
         avg_data["Yediği Gol Ort."] = (home['FTAG'].sum() + away['FTHG'].sum()) / O
         
         # Güvenli ortalama alımı
-        avg_data["Şut Ort."] = (get_safe_mean(home, 'HS') + get_safe_mean(away, 'AS')) * O / O # Ortalama alma mantığı
-        avg_data["İsabetli Şut Ort."] = (get_safe_mean(home, 'HST') + get_safe_mean(away, 'AST')) * O / O
-        avg_data["Faul Ort."] = (get_safe_mean(home, 'HF') + get_safe_mean(away, 'AF')) * O / O
-        avg_data["Sarı Kart Ort."] = (get_safe_mean(home, 'HY') + get_safe_mean(away, 'AY')) * O / O
+        avg_data["Şut Ort."] = (get_safe_mean(home, 'HS') + get_safe_mean(away, 'AS')) / 2
+        avg_data["İsabetli Şut Ort."] = (get_safe_mean(home, 'HST') + get_safe_mean(away, 'AST')) / 2
+        avg_data["Faul Ort."] = (get_safe_mean(home, 'HF') + get_safe_mean(away, 'AF')) / 2
+        avg_data["Sarı Kart Ort."] = (get_safe_mean(home, 'HY') + get_safe_mean(away, 'AY')) / 2
             
         raw_stats.append(avg_data)
         
@@ -156,6 +143,8 @@ def detayli_analiz_motoru(ev, dep, df):
     
     ev_total_shot = get_safe_mean(ev_stats, 'HS', default=12.0); dep_total_shot = get_safe_mean(dep_stats, 'AS', default=10.0)
     ev_shot_target = get_safe_mean(ev_stats, 'HST', default=5.0); dep_shot_target = get_safe_mean(dep_stats, 'AST', default=4.0)
+    
+    ev_faul = get_safe_mean(ev_stats, 'HF', default=10.0); dep_faul = get_safe_mean(dep_stats, 'AF', default=10.0)
 
     toplam_korner = get_safe_mean(ev_stats, 'HC', default=5.0) + get_safe_mean(dep_stats, 'AC', default=4.0)
     toplam_kart = get_safe_mean(ev_stats, 'HY') + get_safe_mean(dep_stats, 'AY')
@@ -176,21 +165,20 @@ def detayli_analiz_motoru(ev, dep, df):
         "korner_tahmin": toplam_korner, "kart_tahmin": toplam_kart,
         "ev_gol": ev_gol_at, "dep_gol": dep_gol_at, "ev_yed": ev_gol_ye, "dep_yed": dep_gol_ye,
         "ev_sut_ort": ev_total_shot, "dep_sut_ort": dep_total_shot,
-        "ev_sut_isabet": ev_shot_target, "dep_sut_isabet": dep_shot_target,
-        "double_chance": f"1X ({ev} veya Berabere)" if ibre > 45 else f"X2 (Berabere veya {dep})",
+        "ev_faul": ev_faul, "dep_faul": dep_faul,
         "sut_isabet_yuzdesi_ev": sut_isabet_yuzdesi_ev, "sut_isabet_yuzdesi_dep": sut_isabet_yuzdesi_dep
     }
 
 # --- ARAYÜZ ---
-st.title("🦁 FUTBOL KAHİNİ V31")
+st.title("🦁 FUTBOL KAHİNİ V32")
 
-# HATA DÜZELTİLDİ: 4 sekme doğru tanımlanıyor.
+# HATA DÜZELTİLDİ: Tab değişkenleri doğru tanımlanıyor
 tab1, tab2, tab3, tab4 = st.tabs(["📊 DETAYLI ANALİZ", "📝 RAW İSTATİSTİK MERKEZİ", "📺 CANLI SKOR", "🤖 ASİSTAN"]) 
 
 # ================= SEKME 1: MAKSİMUM DETAYLI ANALİZ =================
 with tab1:
     st.markdown("### 🕵️‍♂️ MAÇ ANALİZ ROBOTU")
-    st.info(f"📅 Bu analiz, 5 Aralık 2025 tarihli **güncel takım listeleri** ve sezonluk veriler baz alınarak yapılmıştır.")
+    st.info(f"📅 Bu analiz, 5 Aralık 2025 tarihli **mevcut veri tabanı** kullanılarak yapılmıştır.")
 
     c1, c2, c3 = st.columns([2,2,2])
     with c1: secilen_lig = st.selectbox("LİG SEÇİNİZ", list(lig_yapilandirma.keys()), key="analiz_lig")
@@ -201,7 +189,7 @@ with tab1:
         with c2: ev = st.selectbox("EV SAHİBİ", takimlar, key="analiz_ev")
         with c3: dep = st.selectbox("DEPLASMAN", takimlar, index=1, key="analiz_dep")
         
-        # CANLI FORM GÖRÜNTÜLEYİCİ (Teyit)
+        # CANLI FORM GÖRÜNTÜLEYİCİ
         with st.expander("📡 Canlı Form Doğrulama (Tıkla Aç)", expanded=False):
             st.caption("Analizi doğrulamak için Flashscore'dan anlık veri.")
             link_canli = lig_yapilandirma.get(secilen_lig, {}).get('live', 'https://www.flashscore.mobi')
@@ -230,9 +218,9 @@ with tab1:
                 <div class="tactic-box">
                     <div class="tactic-header">MAÇ SENARYOSU VE OYUN ANLAYIŞI</div>
                     <p class="tactic-text">
-                        <b>{ev}</b> takımı genel olarak **{ev_stil}** oyun stilini tercih ediyor. Teknik direktörün oyun anlayışı yüksek tempoyu işaret ediyor. Ev sahibinin **% {res['sut_isabet_yuzdesi_ev']:.1f}** olan şut isabet yüzdesi, rakipten **% {res['sut_isabet_yuzdesi_dep']:.1f}** daha verimli olduğunu gösteriyor.
+                        <b>{ev}</b> takımı genel olarak **{ev_stil}** oyun stilini tercih ediyor. Ev sahibinin şut isabet yüzdesi **% {res['sut_isabet_yuzdesi_ev']:.1f}** ile rakipten **% {res['sut_isabet_yuzdesi_dep']:.1f}** daha verimli.
                         <br><br>
-                        <b>{dep}</b> takımı ise deplasmanda **{dep_stil}** yaklaşımla sahada yer alacaktır. Beklenen korner sayısı **{res['korner_tahmin']:.1f}**. Maçın sonucu **{res['double_chance']}** şeklinde çifte şansa uygun.
+                        <b>{dep}</b> takımı ise deplasmanda **{dep_stil}** yaklaşımla sahada yer alacaktır. Beklenen korner sayısı **{res['korner_tahmin']:.1f}** ve maçın faul ortalaması **{res['ev_faul'] + res['dep_faul']:.1f}** seviyesinde seyredecektir.
                     </p>
                 </div>
                 """, unsafe_allow_html=True)
@@ -251,7 +239,6 @@ with tab1:
                 with p4:
                     st.markdown(f"""<div class="metric-card"><div class="metric-title">GOL YEMEME İHTİMALİ</div><div class="metric-value">{'YÜKSEK' if res['ev_yed'] < 0.8 else 'DÜŞÜK'}</div></div>""", unsafe_allow_html=True)
                 
-                
                 # --- GRAFİKLER (MAX DETAY) ---
                 st.markdown("### 📊 GRAFİKSEL VERİ KARŞILAŞTIRMASI")
 
@@ -266,7 +253,7 @@ with tab1:
                     st.plotly_chart(fig_radar, use_container_width=True)
 
                 with g2:
-                    # Baskı Grafiği (Şut vs İsabetli Şut)
+                    # Şut vs İsabetli Şut Grafiği
                     df_baski = pd.DataFrame({
                         'Takım': [ev, dep, ev, dep],
                         'Tip': ['Toplam Şut', 'Toplam Şut', 'İsabetli Şut', 'İsabetli Şut'],
@@ -278,12 +265,13 @@ with tab1:
                     fig_baski.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font={'color':'white'}, height=300)
                     st.plotly_chart(fig_baski, use_container_width=True)
 
+
             else: st.error("Veri yetersiz.")
 
 # ================= SEKME 2: RAW İSTATİSTİK MERKEZİ =================
 with tab2:
     st.markdown("### 📝 TAKIM ORTALAMA İSTATİSTİKLERİ")
-    st.info("Bu tabloda Yapay Zekanın kullandığı **işlenmiş ortalama ham veri** (Maç Başı) yer alır.")
+    st.info("Bu tabloda Yapay Zekanın kullandığı **işlenmiş ortalama ham veri** (Maç Başı) yer alır. Takım takım ortalamalar listelenmiştir.")
     
     secilen_lig_raw = st.selectbox("Görüntülenecek Ligi Seçiniz:", list(lig_yapilandirma.keys()), key="raw_lig")
     df_raw_base = veri_yukle(secilen_lig_raw)
