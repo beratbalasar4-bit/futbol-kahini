@@ -3,6 +3,7 @@ import streamlit.components.v1 as components
 import pandas as pd
 import plotly.graph_objects as go
 import time
+import datetime
 import random
 
 # --- SAYFA AYARLARI ---
@@ -15,36 +16,32 @@ st.markdown("""
     h1 { color: #00CC96 !important; text-align: center; font-family: 'Arial Black', sans-serif; }
     
     /* Kupon Tasarımı */
-    .kupon-container { background-color: #1F2937; padding: 15px; border-radius: 10px; border: 1px solid #374151; margin-bottom: 10px; }
-    .bahis-tur { color: #F39C12; font-weight: bold; font-size: 12px; letter-spacing: 1px; }
-    .mac-baslik { color: white; font-weight: bold; font-size: 18px; margin: 5px 0; }
-    .oran-kutusu { background-color: #00CC96; color: white; padding: 5px 10px; border-radius: 5px; font-weight: bold; float: right; }
+    .kupon-karti { background-color: #1F2937; padding: 15px; border-radius: 12px; border: 1px solid #374151; margin-bottom: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+    .banko-border { border-left: 8px solid #00CC96; }
+    .surpriz-border { border-left: 8px solid #F39C12; }
     
-    .stButton>button { 
-        background: linear-gradient(to right, #00CC96, #00b887); 
-        color: white; width: 100%; border-radius: 10px; height: 50px; border: none; font-weight: bold;
-    }
+    .mac-baslik { color: white; font-weight: bold; font-size: 16px; margin: 0; }
+    .tahmin-txt { color: #ccc; font-size: 14px; }
+    .oran-badge { float: right; padding: 4px 10px; border-radius: 6px; font-weight: bold; color: white; font-size: 12px; }
+    .oran-yesil { background-color: #00CC96; }
+    .oran-turuncu { background-color: #F39C12; }
     
-    /* Chat Baloncukları */
-    .stChatMessage { background-color: #1F2937; border-radius: 10px; }
+    /* Sohbet */
+    .stChatMessage { background-color: #262730; border-radius: 10px; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- VERİ SETLERİ VE AYARLAR ---
+# --- VERİ SETLERİ ---
 lig_kodlari = {
     "🇹🇷 Türkiye": "T1.csv", "🇬🇧 İngiltere": "E0.csv", "🇪🇸 İspanya": "SP1.csv",
     "🇩🇪 Almanya": "D1.csv", "🇮🇹 İtalya": "I1.csv", "🇫🇷 Fransa": "F1.csv", "🇳🇱 Hollanda": "N1.csv"
 }
 
-# Takma Adlar Sözlüğü (Chatbot için)
 takma_adlar = {
-    "fener": "Fenerbahçe", "fb": "Fenerbahçe", "fenerbahçe": "Fenerbahçe",
-    "gala": "Galatasaray", "gs": "Galatasaray", "cimbom": "Galatasaray", "galatasaray": "Galatasaray",
-    "bjk": "Beşiktaş", "beşiktaş": "Beşiktaş", "kartal": "Beşiktaş",
-    "ts": "Trabzonspor", "trabzon": "Trabzonspor",
-    "city": "Manchester City", "man city": "Manchester City",
-    "united": "Manchester United", "man utd": "Manchester United",
-    "real": "Real Madrid", "barca": "Barcelona"
+    "fener": "Fenerbahçe", "fb": "Fenerbahçe", "gala": "Galatasaray", "gs": "Galatasaray",
+    "bjk": "Beşiktaş", "ts": "Trabzonspor", "city": "Manchester City", "united": "Manchester United",
+    "real": "Real Madrid", "barca": "Barcelona", "bayern": "Bayern Munich", "mainz": "Mainz",
+    "gladbach": "M'gladbach", "dortmund": "Dortmund"
 }
 
 takim_duzeltme = {
@@ -57,7 +54,6 @@ takim_duzeltme = {
 # --- GLOBAL VERİ YÜKLEYİCİ ---
 @st.cache_data(ttl=3600)
 def tum_verileri_yukle():
-    """Tüm liglerin verisini tek seferde çeker ve hafızaya alır"""
     tum_df = pd.DataFrame()
     ana_url = "https://www.football-data.co.uk/mmz4281/2425/"
     
@@ -68,14 +64,13 @@ def tum_verileri_yukle():
             df = df.dropna(subset=['FTR'])
             df['HomeTeam'] = df['HomeTeam'].replace(takim_duzeltme)
             df['AwayTeam'] = df['AwayTeam'].replace(takim_duzeltme)
-            df['Lig'] = lig_ad # Hangi ligden olduğunu bilelim
+            df['Lig'] = lig_ad 
             tum_df = pd.concat([tum_df, df])
         except: continue
     return tum_df
 
-# Verileri Yükle
 global_df = tum_verileri_yukle()
-tum_takimlar = global_df['HomeTeam'].unique() if not global_df.empty else []
+tum_takimlar = sorted(global_df['HomeTeam'].unique()) if not global_df.empty else []
 
 # --- ANALİZ MOTORU ---
 def mac_analiz_et(ev, dep, df):
@@ -92,28 +87,123 @@ def mac_analiz_et(ev, dep, df):
     gol_beklentisi = (ev_stats['FTHG'].mean() + dep_stats['FTAG'].mean()) / 2 + \
                      (dep_stats['FTHG'].mean() + ev_stats['FTAG'].mean()) / 2
     
-    # Korner (Varsa)
+    # Korner
     korner = 9.0
     if 'HC' in df.columns:
         korner = (ev_stats['HC'].mean() + dep_stats['AC'].mean()) 
 
     fark = ev_guc - dep_guc
     ibre = 50 + (fark / 1.5)
-    return {"ibre": ibre, "gol": gol_beklentisi, "korner": korner, "ev_guc": ev_guc, "dep_guc": dep_guc}
+    return {"ibre": ibre, "gol": gol_beklentisi, "korner": korner}
 
 # --- ANA SAYFA ---
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/3233/3233496.png", width=100)
     st.markdown("### 🦁 SÜPER ASİSTAN")
-    st.info("Yapay Zeka tüm Avrupa liglerini tarıyor.")
+    st.success(f"📅 Tarih: {datetime.datetime.now().strftime('%d.%m.%Y')}")
+    st.info("Canlı Skor'dan bugünün maçlarına bak, kupon sekmesinde o takımları seç!")
 
 st.title("🌍 FUTBOL KAHİNİ AI")
 
-# --- SEKME YAPISI ---
-tab1, tab2, tab3 = st.tabs(["📊 TEK MAÇ ANALİZİ", "🎟️ GLOBAL KARIŞIK KUPON", "🤖 AKILLI SOHBET"])
+# --- CANLI SKOR (MAÇ PROGRAMI İÇİN) ---
+with st.expander("📅 BUGÜNÜN MAÇ PROGRAMI (Canlı Skor)", expanded=False):
+    components.html("""<iframe src="https://www.livescore.bz" width="100%" height="600" frameborder="0" style="background-color: white; border-radius: 8px;"></iframe>""", height=600, scrolling=True)
 
-# ================= SEKME 1: ANALİZ =================
+# --- SEKME YAPISI ---
+tab1, tab2, tab3 = st.tabs(["🎟️ KUPON OLUŞTURUCU", "📊 TEK MAÇ ANALİZİ", "🤖 SOHBET"])
+
+# ================= SEKME 1: AKILLI KUPON OLUŞTURUCU =================
 with tab1:
+    st.subheader("🎯 HANGİ MAÇLARA KUPON YAPALIM?")
+    st.markdown("Yukarıdaki fikstürden bugün oynayan maçları seç, **Banko** ve **Sürpriz** kuponunu ben hazırlayayım.")
+    
+    # 1. Kullanıcı Bugün Oynayan Takımları Seçer (Manuel ama Kesin Çözüm)
+    secilen_takimlar = st.multiselect("Bugün Maçı Olan Ev Sahibi Takımları Seç:", tum_takimlar, placeholder="Örn: Mainz, Fenerbahçe, Arsenal...")
+    
+    col_k1, col_k2 = st.columns(2)
+    
+    if st.button("KUPONLARI HAZIRLA 🚀", type="primary"):
+        if not secilen_takimlar:
+            st.error("Lütfen en az 1 takım seç!")
+        else:
+            with st.spinner("Yapay zeka seçtiğin maçları analiz ediyor..."):
+                time.sleep(1)
+                
+                banko_kupon = []
+                surpriz_kupon = []
+                
+                for ev_sahibi in secilen_takimlar:
+                    # Bu ev sahibinin oynadığı ligi ve rakibini bulmamız lazım
+                    # (Otomatik bulmaya çalışıyoruz, son maç verisinden ligi tahmin ediyoruz)
+                    takim_data = global_df[global_df['HomeTeam'] == ev_sahibi]
+                    if not takim_data.empty:
+                        lig = takim_data.iloc[0]['Lig']
+                        # Rakibi bulmak zor olduğu için simülasyon yerine
+                        # Kullanıcıya sadece Ev Sahibi analizi veriyoruz VEYA
+                        # Kullanıcıya rakibi de seçtirebiliriz ama bu çok uzun sürer.
+                        # Basitlik için: Ev sahibinin GENEL GÜCÜNE göre tahmin yapıyoruz.
+                        
+                        ev_guc = takim_data['FTHG'].mean() * 1.5 - takim_data['FTAG'].mean()
+                        gol_ort = takim_data['FTHG'].mean() + takim_data['FTAG'].mean()
+                        
+                        # --- BANKO MANTIK ---
+                        if ev_guc > 1.2:
+                            banko_kupon.append({"Maç": f"{ev_sahibi} Kazanır", "Tahmin": "MS 1", "Oran": 1.45, "Güven": ev_guc})
+                        elif gol_ort > 3.0:
+                            banko_kupon.append({"Maç": f"{ev_sahibi} Maçı", "Tahmin": "2.5 ÜST", "Oran": 1.55, "Güven": gol_ort})
+                        else:
+                            # Banko çıkmazsa Sürprize at
+                            pass
+                            
+                        # --- SÜRPRİZ MANTIK ---
+                        if 0 < ev_guc < 0.5: # Güç farkı azsa beraberlik
+                            surpriz_kupon.append({"Maç": f"{ev_sahibi} Beraberlik", "Tahmin": "MS 0", "Oran": 3.20, "Güven": 5})
+                        elif gol_ort > 3.5:
+                            surpriz_kupon.append({"Maç": f"{ev_sahibi} Maçı", "Tahmin": "3.5 ÜST", "Oran": 2.80, "Güven": 4})
+
+                # --- SONUÇLARI GÖSTER ---
+                
+                # SOL TARAFA BANKO
+                with col_k1:
+                    st.success("🔒 GÜNÜN BANKO KUPONU")
+                    st.caption("Düşük Risk, Mantıklı Tercihler")
+                    if banko_kupon:
+                        toplam_oran = 1.0
+                        for mac in banko_kupon[:3]: # En iyi 3
+                            toplam_oran *= mac['Oran']
+                            st.markdown(f"""
+                            <div class="kupon-karti banko-border">
+                                <span class="oran-badge oran-yesil">{mac['Oran']}</span>
+                                <div class="mac-baslik">{mac['Maç']}</div>
+                                <div class="tahmin-txt">Tahmin: <b>{mac['Tahmin']}</b></div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        st.markdown(f"**Toplam Oran: {toplam_oran:.2f}**")
+                    else:
+                        st.warning("Seçtiğin takımlardan banko fırsat çıkmadı.")
+
+                # SAĞ TARAFA SÜRPRİZ
+                with col_k2:
+                    st.warning("🔥 GÜNÜN SÜRPRİZ KUPONU")
+                    st.caption("Yüksek Oran, Yüksek Kazanç")
+                    if surpriz_kupon:
+                        toplam_oran_s = 1.0
+                        for mac in surpriz_kupon[:3]:
+                            toplam_oran_s *= mac['Oran']
+                            st.markdown(f"""
+                            <div class="kupon-karti surpriz-border">
+                                <span class="oran-badge oran-turuncu">{mac['Oran']}</span>
+                                <div class="mac-baslik">{mac['Maç']}</div>
+                                <div class="tahmin-txt">Tahmin: <b>{mac['Tahmin']}</b></div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        st.markdown(f"**Toplam Oran: {toplam_oran_s:.2f}**")
+                    else:
+                        st.info("Bu maçlarda sürpriz potansiyeli düşük.")
+
+# ================= SEKME 2: TEK MAÇ ANALİZİ =================
+with tab2:
+    st.subheader("📊 DETAYLI KARŞILAŞTIRMA")
     lig = st.selectbox("Lig Seç:", list(lig_kodlari.keys()))
     df_lig = global_df[global_df['Lig'] == lig]
     
@@ -122,159 +212,79 @@ with tab1:
     with c1: ev = st.selectbox("Ev Sahibi", takimlar_lig)
     with c2: dep = st.selectbox("Deplasman", takimlar_lig, index=1)
     
-    if st.button("DETAYLI ANALİZ ET 🚀"):
+    if st.button("ANALİZ ET 🚀"):
         sonuc = mac_analiz_et(ev, dep, df_lig)
         if sonuc:
-            # Görselleştirme
-            fig = go.Figure(go.Indicator(
-                mode = "gauge+number", value = sonuc['ibre'],
-                title = {'text': "Ev Sahibi Şansı"},
-                gauge = {'axis': {'range': [0, 100]}, 'bar': {'color': "white"}, 'steps': [{'range': [0, 45], 'color': "#FF4B4B"}, {'range': [55, 100], 'color': "#00CC96"}]}
-            ))
-            fig.update_layout(height=250, margin=dict(t=30,b=20,l=20,r=20), paper_bgcolor='rgba(0,0,0,0)')
-            st.plotly_chart(fig, use_container_width=True)
+            col_g1, col_g2 = st.columns([2,1])
+            with col_g1:
+                fig = go.Figure(go.Indicator(
+                    mode = "gauge+number", value = sonuc['ibre'],
+                    title = {'text': "Kazanma Şansı %"},
+                    gauge = {'axis': {'range': [0, 100]}, 'bar': {'color': "white"}, 'steps': [{'range': [0, 45], 'color': "#FF4B4B"}, {'range': [55, 100], 'color': "#00CC96"}]}
+                ))
+                fig.update_layout(height=250, margin=dict(t=30,b=20,l=20,r=20), paper_bgcolor='rgba(0,0,0,0)')
+                st.plotly_chart(fig, use_container_width=True)
             
-            k1, k2, k3 = st.columns(3)
-            k1.info(f"⚽ Gol Beklentisi: **{sonuc['gol']:.2f}**")
-            k2.warning(f"⛳ Korner Tahmini: **{sonuc['korner']:.1f}**")
-            k3.success(f"🧠 Güven Skoru: **{abs(sonuc['ibre']-50):.0f}**")
+            with col_g2:
+                st.info(f"⚽ Gol Beklentisi: **{sonuc['gol']:.2f}**")
+                st.warning(f"⛳ Korner Tahmini: **{sonuc['korner']:.1f}**")
+                
+                if sonuc['gol'] > 2.8: st.success("✅ **2.5 ÜST** Biter")
+                else: st.error("🧊 **2.5 ALT** Biter")
         else: st.error("Veri Yok")
 
-# ================= SEKME 2: GLOBAL KUPON (ÇEŞİTLİ BAHİS) =================
-with tab2:
-    st.subheader("🔥 YAPAY ZEKA KARIŞIK KUPON")
-    st.markdown("Sistem 7 büyük ligi tarar ve **Maç Sonucu**, **Gol**, **Korner** ve **KG Var** seçeneklerinden en sağlamlarını seçer.")
-    
-    if st.button("BÜYÜK KUPONU OLUŞTUR 🎰"):
-        with st.spinner("Tüm Avrupa ligleri taranıyor..."):
-            time.sleep(1.5)
-            
-            # --- KUPON MOTORU ---
-            bankolar = []
-            
-            # Ligdeki güçlü takımları ve golcüleri bul
-            for lig in lig_kodlari.keys():
-                df_temp = global_df[global_df['Lig'] == lig]
-                if df_temp.empty: continue
-                
-                takimlar = df_temp['HomeTeam'].unique()
-                # Rassal 3 takım seç (Her seferinde farklı analiz yapsın diye)
-                sample_takimlar = random.sample(list(takimlar), min(len(takimlar), 5))
-                
-                for t in sample_takimlar:
-                    stats = df_temp[df_temp['HomeTeam'] == t]
-                    if len(stats) < 3: continue
-                    
-                    # 1. MAÇ SONUCU (Ev Gücü)
-                    ev_guc = stats['FTHG'].mean() - stats['FTAG'].mean()
-                    if ev_guc > 1.5:
-                        bankolar.append({"Lig": lig, "Maç": f"{t} (Ev)", "Tür": "MAÇ SONUCU", "Tahmin": "MS 1", "Güven": ev_guc + 80})
-                    
-                    # 2. GOL (2.5 ÜST)
-                    gol_ort = stats['FTHG'].mean() + stats['FTAG'].mean()
-                    if gol_ort > 3.2:
-                        bankolar.append({"Lig": lig, "Maç": f"{t} Maçı", "Tür": "GOL BAHİSİ", "Tahmin": "2.5 ÜST", "Güven": gol_ort * 25})
-                    
-                    # 3. KORNER (9.5 ÜST)
-                    if 'HC' in df_temp.columns:
-                        korn_ort = stats['HC'].mean() + stats['AC'].mean()
-                        if korn_ort > 10.5:
-                            bankolar.append({"Lig": lig, "Maç": f"{t} Maçı", "Tür": "KORNER", "Tahmin": "9.5 ÜST", "Güven": korn_ort * 8})
-
-            # En yüksek güvenli 4 maçı seç
-            kupon = sorted(bankolar, key=lambda x: x['Güven'], reverse=True)[:4]
-            
-            # Ekrana Bas
-            if kupon:
-                st.balloons()
-                st.success("✅ GÜNÜN BANKO KUPONU HAZIR")
-                
-                total_oran = 1.0
-                
-                for mac in kupon:
-                    # Rastgele oran süsü (Gerçek oran API paralı olduğu için)
-                    oran = round(random.uniform(1.30, 1.85), 2)
-                    total_oran *= oran
-                    
-                    st.markdown(f"""
-                    <div class="kupon-container">
-                        <span class="bahis-tur">{mac['Lig']} • {mac['Tür']}</span>
-                        <div class="oran-kutusu">{oran}</div>
-                        <div class="mac-baslik">{mac['Maç']}</div>
-                        <div style="color:#ccc;">Tahmin: <b style="color:#00CC96;">{mac['Tahmin']}</b></div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                
-                st.markdown(f"### 🚀 Toplam Tahmini Oran: **{total_oran:.2f}**")
-            else:
-                st.warning("Yeterli güvenilir maç bulunamadı.")
-
-# ================= SEKME 3: AKILLI SOHBET (NLP) =================
+# ================= SEKME 3: SOHBET ROBOTU =================
 with tab3:
-    st.subheader("🤖 YAPAY ZEKA İLE KONUŞ")
-    st.caption("Örnek: 'Beşiktaş Fener maçı ne olur?', 'Galatasaray gol atar mı?', 'City form durumu'")
+    st.subheader("💬 SOHBET ET")
+    st.caption("Hem maç sorabilirsin, hem sohbet edebilirsin.")
 
     if "messages" not in st.session_state:
-        st.session_state.messages = [{"role": "assistant", "content": "Selam! Maçları sor, analiz edeyim."}]
+        st.session_state.messages = [{"role": "assistant", "content": "Selam! Ben senin futbol asistanınım. Bugün hangi maça bakalım?"}]
 
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]): st.write(msg["content"])
 
-    if prompt := st.chat_input("Sorunu yaz..."):
+    if prompt := st.chat_input("Mesajını yaz..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"): st.write(prompt)
 
-        # --- AKILLI CEVAP MOTORU ---
-        cevap = "Bunu anlayamadım. Takım isimlerini doğru yazdığından emin ol."
+        # --- GELİŞMİŞ SOHBET MOTORU ---
         prompt_lower = prompt.lower()
-        
-        # 1. Cümledeki Takımları Bul
-        bulunanlar = []
-        
-        # Önce takma adları kontrol et (fb -> fenerbahçe)
-        for kisa, uzun in takma_adlar.items():
-            if kisa in prompt_lower.split(): # Kelime olarak geçiyorsa
-                if uzun not in bulunanlar: bulunanlar.append(uzun)
-        
-        # Sonra gerçek isimleri kontrol et
-        for takim in tum_takimlar:
-            if takim.lower() in prompt_lower:
-                if takim not in bulunanlar: bulunanlar.append(takim)
-        
-        # --- SENARYO A: İKİ TAKIM VAR (KARŞILAŞTIRMA) ---
-        if len(bulunanlar) >= 2:
-            ev, dep = bulunanlar[0], bulunanlar[1]
-            sonuc = mac_analiz_et(ev, dep, global_df)
-            
-            if sonuc:
-                if sonuc['ibre'] > 55: favori = ev
-                elif sonuc['ibre'] < 45: favori = dep
-                else: favori = "Beraberlik"
-                
-                cevap = f"📊 **{ev} vs {dep} Analizim:**\n\n" \
-                        f"İstatistiklere göre **{favori}** tarafı daha ağır basıyor. " \
-                        f"Bu maçta Gol Beklentisi **{sonuc['gol']:.2f}**. " \
-                        f"{( 'Bol gollü geçer (2.5 Üst).' if sonuc['gol']>2.8 else 'Kısır geçebilir (Alt).' )}"
-            else:
-                cevap = "Bu iki takımı buldum ama yeterli verileri yok."
+        cevap = ""
 
-        # --- SENARYO B: TEK TAKIM VAR ---
-        elif len(bulunanlar) == 1:
-            takim = bulunanlar[0]
-            stats = global_df[global_df['HomeTeam'] == takim]
-            if not stats.empty:
-                gol_at = stats['FTHG'].mean()
-                gol_ye = stats['FTAG'].mean()
-                cevap = f"🧐 **{takim}** Hakkında Rapor:\n\n" \
-                        f"Bu sezon iç sahada ortalama **{gol_at:.2f}** gol atıp, **{gol_ye:.2f}** gol yiyor. " \
-                        f"Genel form durumu: {'🔥 Çok Formda' if gol_at > 2 else '😐 Orta Şeker'}."
-            else:
-                cevap = f"{takim} verilerini şu an çekemedim."
+        # 1. Sohbet / Geyik Modu
+        sohbet_kelimeleri = ["naber", "nasılsın", "nasilsin", "ne haber"]
+        kimsin_kelimeleri = ["kimsin", "adın ne", "sen kimsin"]
         
-        # --- SENARYO C: HİÇBİR ŞEY YOK ---
+        if any(x in prompt_lower for x in sohbet_kelimeleri):
+            cevap = random.choice(["İyiyim patron, maçları analiz ediyorum. Sen nasılsın?", "Bomba gibiyim! Bugün güzel kuponlar çıkaracağız.", "Kodlarım tıkır tıkır çalışıyor, gole açım!"])
+        elif any(x in prompt_lower for x in kimsin_kelimeleri):
+            cevap = "Ben Futbol Kahini. Yapay zeka ile istatistikleri çiğneyip sana banko kuponlar sunan dijital asistanım. 🦁"
+        
+        # 2. Maç Analiz Modu
         else:
-            if "kupon" in prompt_lower: cevap = "Kupon sekmesine geçersen senin için banko kupon hazırladım!"
-            elif "selam" in prompt_lower: cevap = "Selam! Hangi takımı analiz edelim?"
-        
+            # Takımları Bul
+            bulunanlar = []
+            for kisa, uzun in takma_adlar.items(): # Önce takma adlar
+                if kisa in prompt_lower.split(): 
+                    if uzun not in bulunanlar: bulunanlar.append(uzun)
+            
+            for takim in tum_takimlar: # Sonra gerçek adlar
+                if takim.lower() in prompt_lower:
+                    if takim not in bulunanlar: bulunanlar.append(takim)
+
+            if len(bulunanlar) >= 2:
+                ev, dep = bulunanlar[0], bulunanlar[1]
+                sonuc = mac_analiz_et(ev, dep, global_df)
+                if sonuc:
+                    favori = ev if sonuc['ibre'] > 55 else (dep if sonuc['ibre'] < 45 else "Beraberlik")
+                    cevap = f"📊 **{ev} vs {dep}** kapışması!\n\nVerilere baktım, ibre **{favori}** tarafını gösteriyor. Gol beklentisi **{sonuc['gol']:.2f}**. Bence maçta bol pozisyon olur."
+                else: cevap = "Bu takımların verilerini bulamadım."
+            elif len(bulunanlar) == 1:
+                cevap = f"🤔 **{bulunanlar[0]}** hakkında konuşuyorsun. Tek takım analiz edemem, rakibini de söyle kapıştırayım!"
+            else:
+                if not cevap: # Sohbet de değilse
+                    cevap = "Bunu tam anlamadım. Takım adı yazarsan analiz ederim, ya da 'naber' yaz sohbet edelim."
+
         with st.chat_message("assistant"): st.write(cevap)
         st.session_state.messages.append({"role": "assistant", "content": cevap})
