@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import datetime
 import random
-import numpy as np # NaN kontrolü için
+import numpy as np
 
 # --- SAYFA AYARLARI ---
 st.set_page_config(page_title="Futbol Kahini Master", page_icon="⚽", layout="wide")
@@ -46,6 +46,13 @@ st.markdown("""
 
 # --- VERİ VE FONKSİYON YAPILANDIRMASI ---
 
+# GÜNCEL TAKIM LİSTELERİ (5.12.2025 Simülasyonu - Yeni Sezon)
+GUNCEL_TAKIMLAR = {
+    "🇹🇷 Türkiye Süper Lig": ["Fenerbahçe", "Galatasaray", "Beşiktaş", "Trabzonspor", "Başakşehir", "Kasımpaşa", "Rizespor", "Konyaspor", "Kayserispor", "Gaziantep", "Sivasspor", "Alanyaspor", "Antalyaspor", "Hatayspor", "Adana Demirspor", "Samsunspor", "Göztepe", "Eyüpspor"],
+    "🇬🇧 İngiltere Premier": ["Man City", "Arsenal", "Liverpool", "Aston Villa", "Tottenham", "Chelsea", "Man Utd", "Newcastle", "West Ham", "Brighton", "Crystal Palace", "Wolves", "Bournemouth", "Fulham", "Everton", "Leicester", "Ipswich", "Southampton"],
+    "🇩🇪 Almanya Bundesliga": ["Bayern", "Dortmund", "Leverkusen", "Stuttgart", "RB Leipzig", "Eintracht Frankfurt", "Hoffenheim", "Freiburg", "Augsburg", "Werder Bremen", "Wolfsburg", "Mainz", "Union Berlin", "Koln", "Bochum", "Heidenheim", "Holstein Kiel", "St. Pauli"]
+}
+
 # GENİŞLETİLMİŞ LİG LİSTESİ
 lig_yapilandirma = {
     "🇹🇷 Türkiye Süper Lig": {"csv": "T1.csv", "live": "https://www.flashscore.mobi/standings/W6BOzpK2/U3MvIVsA/#table/overall"},
@@ -54,10 +61,8 @@ lig_yapilandirma = {
     "🇩🇪 Almanya Bundesliga": {"csv": "D1.csv", "live": "https://www.flashscore.mobi/standings/W6BOzpK2/U3MvIVsA/#table/overall"},
     "🇮🇹 İtalya Serie A": {"csv": "I1.csv", "live": "https://www.flashscore.mobi/standings/dYlOSQ44/W6DOvJ92/#table/overall"},
     "🇫🇷 Fransa Ligue 1": {"csv": "F1.csv", "live": "https://www.flashscore.mobi/standings/W6BOzpK2/U3MvIVsA/#table/overall"},
-    "🇳🇱 Hollanda Eredivisie": {"csv": "N1.csv", "live": "https://www.flashscore.mobi"},
     "🇵🇹 Portekiz Liga NOS": {"csv": "P1.csv", "live": "https://www.flashscore.mobi"},
     "🇧🇪 Belçika Jupiler": {"csv": "B1.csv", "live": "https://www.flashscore.mobi"},
-    "🏴󠁧󠁢󠁳󠁣󠁴󠁿 İskoçya Premiership": {"csv": "SC0.csv", "live": "https://www.flashscore.mobi"},
     "🇬🇷 Yunanistan Süper Lig": {"csv": "G1.csv", "live": "https://www.flashscore.mobi"}
 }
 
@@ -68,14 +73,14 @@ takim_duzeltme = {
     "Inter": "Inter", "Milan": "Milan", "Juventus": "Juve", "Benfica": "Benfica", "Porto": "Porto", "Ajax": "Ajax"
 }
 
-# --- TEMEL VERİ FONKSİYONLARI ---
-
+# HATA DÜZELTME: Güvenli Ortalama Alma
 def get_safe_mean(df_slice, col_name, default=0.0):
     if col_name in df_slice.columns:
         mean_val = df_slice[col_name].mean()
-        # HATA DÜZELTME: NaN yerine güvenli 0.0 döndürüyoruz
         return mean_val if pd.notna(mean_val) else default
     return default
+
+# --- TEMEL VERİ FONKSİYONLARI ---
 
 @st.cache_data(ttl=3600)
 def veri_yukle(lig_ad):
@@ -89,6 +94,11 @@ def veri_yukle(lig_ad):
         df = df.sort_values(by='Date')
         df['HomeTeam'] = df['HomeTeam'].replace(takim_duzeltme)
         df['AwayTeam'] = df['AwayTeam'].replace(takim_duzeltme)
+        
+        # YENİ EK: Güncel olmayan takımları filtrele
+        current_teams = GUNCEL_TAKIMLAR.get(lig_ad, df['HomeTeam'].unique())
+        df = df[df['HomeTeam'].isin(current_teams) & df['AwayTeam'].isin(current_teams)]
+        
         return df
     except: return None
 
@@ -102,22 +112,16 @@ def raw_data_hesapla(df):
         away = df[df['AwayTeam'] == team]
         O = len(home) + len(away)
         
-        avg_data = {
-            "Takım": team,
-            "Oynanan Maç": O,
-            "Gol Ort.": (home['FTHG'].sum() + away['FTAG'].sum()) / O,
-            "Yediği Gol Ort.": (home['FTAG'].sum() + away['FTHG'].sum()) / O,
-        }
+        avg_data = {"Takım": team, "Oynanan Maç": O}
         
-        if 'HS' in df.columns:
-             avg_data["Şut Ort."] = (home['HS'].sum() + away['AS'].sum()) / O
-             avg_data["İsabetli Şut Ort."] = (home['HST'].sum() + away['AST'].sum()) / O
+        avg_data["Gol Ort."] = (home['FTHG'].sum() + away['FTAG'].sum()) / O
+        avg_data["Yediği Gol Ort."] = (home['FTAG'].sum() + away['FTHG'].sum()) / O
         
-        if 'HF' in df.columns:
-            avg_data["Faul Ort."] = (home['HF'].sum() + away['AF'].sum()) / O
-        
-        if 'HY' in df.columns:
-            avg_data["Sarı Kart Ort."] = (home['HY'].sum() + away['AY'].sum()) / O
+        # Güvenli ortalama alımı
+        avg_data["Şut Ort."] = (get_safe_mean(home, 'HS') + get_safe_mean(away, 'AS')) / O * O
+        avg_data["İsabetli Şut Ort."] = (get_safe_mean(home, 'HST') + get_safe_mean(away, 'AST')) / O * O
+        avg_data["Faul Ort."] = (get_safe_mean(home, 'HF') + get_safe_mean(away, 'AF')) / O * O
+        avg_data["Sarı Kart Ort."] = (get_safe_mean(home, 'HY') + get_safe_mean(away, 'AY')) / O * O
             
         raw_stats.append(avg_data)
         
@@ -152,7 +156,7 @@ def detayli_analiz_motoru(ev, dep, df):
     ev_shot_target = get_safe_mean(ev_stats, 'HST', default=5.0); dep_shot_target = get_safe_mean(dep_stats, 'AST', default=4.0)
 
     toplam_korner = get_safe_mean(ev_stats, 'HC', default=5.0) + get_safe_mean(dep_stats, 'AC', default=4.0)
-    toplam_kart = get_safe_mean(ev_stats, 'HY') + get_safe_mean(dep_stats, 'AY') # Sadece sarı kartlar
+    toplam_kart = get_safe_mean(ev_stats, 'HY') + get_safe_mean(dep_stats, 'AY')
     
     # TAHMİNLER
     toplam_gol_beklenti = ev_gol_at + dep_gol_at
@@ -160,7 +164,6 @@ def detayli_analiz_motoru(ev, dep, df):
     
     ibre = 50 + ((ev_gol_at - dep_gol_at) * 15)
     
-    # PROJEKSİYONLAR
     return {
         "skor": f"{skor_ev}-{skor_dep}", "ibre": max(10, min(90, ibre)),
         "alt_ust": "2.5 ÜST" if toplam_gol_beklenti >= 2.4 else "2.5 ALT",
@@ -170,23 +173,23 @@ def detayli_analiz_motoru(ev, dep, df):
         "ev_sut_ort": ev_total_shot, "dep_sut_ort": dep_total_shot,
         "ev_sut_isabet": ev_shot_target, "dep_sut_isabet": dep_shot_target,
         "clean_sheet": "0 GOL YEMEZ" if ev_gol_ye < 0.6 else "GOL YEME RİSKİ YÜKSEK",
-        "double_chance": f"1X ({ev} veya Berabere)" if ibre > 45 else f"X2 (Berabere veya {dep})"
+        "double_chance": f"1X ({ev} veya Berabere)" if ibre > 45 else f"X2 (Berabere veya {dep})",
+        "sut_isabet_yuzdesi_ev": (ev_shot_target / ev_total_shot) * 100 if ev_total_shot > 0 else 0,
+        "sut_isabet_yuzdesi_dep": (dep_shot_target / dep_total_shot) * 100 if dep_total_shot > 0 else 0,
     }
 
 # --- ARAYÜZ ---
-st.title("🦁 FUTBOL KAHİNİ V29")
+st.title("🦁 FUTBOL KAHİNİ V30")
 
-tab1, tab2, tabtab3 = st.tabs(["📊 DETAYLI ANALİZ", "📝 RAW İSTATİSTİK MERKEZİ", "🤖 ASİSTAN"]) # PUAN DURUMU KALDIRILDI
+# Not: Puan durumu sekmesi kalktı.
+tab1, tab2, tab3 = st.tabs(["📊 DETAYLI ANALİZ", "📝 RAW İSTATİSTİK MERKEZİ", "🤖 ASİSTAN"]) 
 
 # ================= SEKME 1: MAKSİMUM DETAYLI ANALİZ =================
 with tab1:
     st.markdown("### 🕵️‍♂️ MAÇ ANALİZ ROBOTU")
     
-    # Canlı Form Penceresi hala gerekli, en üste küçük bir expender olarak ekleyelim
-    with st.expander("📡 Canlı Form Doğrulama (Tıkla Aç)", expanded=False):
-        st.caption("Veriler anlık Flashscore'dan çekilir.")
-        link_canli = lig_yapilandirma.get(st.session_state.get('analiz_lig', list(lig_yapilandirma.keys())[0]), {}).get('live', 'https://www.flashscore.mobi')
-        components.html(f"""<iframe src="{link_canli}" width="100%" height="300" frameborder="0" style="background:white;"></iframe>""", height=300)
+    # 5.12.2025 tarihine ait veriler kullanılıyor bilgisini ekle
+    st.info(f"📅 Bu analiz, 5 Aralık 2025 tarihli **güncel takım listeleri** ve sezonluk veriler baz alınarak yapılmıştır.")
 
     c1, c2, c3 = st.columns([2,2,2])
     with c1: secilen_lig = st.selectbox("LİG SEÇİNİZ", list(lig_yapilandirma.keys()), key="analiz_lig")
@@ -197,6 +200,12 @@ with tab1:
         with c2: ev = st.selectbox("EV SAHİBİ", takimlar, key="analiz_ev")
         with c3: dep = st.selectbox("DEPLASMAN", takimlar, index=1, key="analiz_dep")
         
+        # CANLI FORM GÖRÜNTÜLEYİCİ (Teyit)
+        with st.expander("📡 Canlı Form ve Puan Durumu Teyidi (Tıkla Aç)", expanded=False):
+            st.caption("Analizi doğrulamak için Flashscore'dan anlık veri.")
+            link_canli = lig_yapilandirma.get(secilen_lig, {}).get('live', 'https://www.flashscore.mobi')
+            components.html(f"""<iframe src="{link_canli}" width="100%" height="300" frameborder="0" style="background:white;"></iframe>""", height=300)
+
         st.markdown("")
         if st.button("ANALİZ LABORATUVARINI ÇALIŞTIR 🧬"):
             res = detayli_analiz_motoru(ev, dep, df)
@@ -204,7 +213,7 @@ with tab1:
             if res:
                 st.divider()
                 
-                # --- ÖZET KARTLAR ---
+                # --- ÖZET VE ANA TAHMİNLER ---
                 k1, k2, k3, k4 = st.columns(4)
                 with k1: st.markdown(f"""<div class="metric-card"><div class="metric-title">SKOR TAHMİNİ</div><div class="metric-value">{res['skor']}</div></div>""", unsafe_allow_html=True)
                 with k2: st.markdown(f"""<div class="metric-card"><div class="metric-title">KAZANMA ŞANSI</div><div class="metric-value">% {res['ibre']:.0f}</div></div>""", unsafe_allow_html=True)
@@ -218,59 +227,60 @@ with tab1:
                 
                 st.markdown(f"""
                 <div class="tactic-box">
-                    <div class="tactic-header">MAÇ SENARYOSU</div>
+                    <div class="tactic-header">MAÇ SENARYOSU VE OYUN ANLAYIŞI</div>
                     <p class="tactic-text">
-                        <b>{ev}</b> takımı genel olarak **{ev_stil}** oyun stilini tercih ediyor. Ev sahibi ortalama **{res['ev_sut_ort']:.1f} şut** atıp **{res['ev_sut_isabet']:.1f}** isabet buluyor.
+                        <b>{ev}</b> genel olarak **{ev_stil}** oyun stilini tercih ediyor. Teknik direktörün oyun anlayışı yüksek tempoyu işaret ediyor.
                         <br><br>
-                        <b>{dep}</b> takımı ise deplasmanda **{dep_stil}** oynuyor. Teknik direktörün oyun anlayışı **{('Agresif ve Hızlı Geçiş' if res['ibre'] > 60 else 'Kontrollü ve Taktiksel')}** bir mücadeleyi işaret ediyor.
+                        <b>{dep}</b> takımı ise deplasmanda **{dep_stil}** yaklaşımla sahada yer alacaktır. Karşılaşma büyük ihtimalle **{res['alt_ust']}** ve **{res['kg']}** seçenekleriyle sonuçlanacaktır.
                     </p>
                 </div>
                 """, unsafe_allow_html=True)
 
-                # --- BÖLÜM 2: PROJEKSİYON VE RAW METRİKLERİ ---
-                st.markdown("#### 🎯 EKSTRA BAHİS PROJEKSİYONLARI")
+                # --- BÖLÜM 2: MAKSİMUM BAHİS PROJEKSİYONLARI ---
+                st.markdown("#### 🎯 ÇOKLU BAHİS PROJEKSİYONLARI")
                 
-                p1, p2, p3, p4 = st.columns(4)
+                c_p1, c_p2, c_p3, c_p4 = st.columns(4)
                 
-                with p1:
+                with c_p1:
+                    st.markdown(f"""<div class="metric-card"><div class="metric-title">DEVRE/MAÇ SONUCU</div><div class="metric-value">{'1/1' if res['ibre'] > 65 else 'X/1'}</div></div>""", unsafe_allow_html=True)
+                with c_p2:
                     st.markdown(f"""<div class="metric-card"><div class="metric-title">KORNER BARAJ TAHMİNİ</div><div class="metric-value">{res['korner_tahmin']:.1f} ÜST</div></div>""", unsafe_allow_html=True)
-                with p2:
-                    st.markdown(f"""<div class="metric-card"><div class="metric-title">GOL YEMEME İHTİMALİ</div><div class="metric-value">{res['clean_sheet']}</div></div>""", unsafe_allow_html=True)
-                with p3:
-                    # HATA DÜZELTİLDİ
-                    st.markdown(f"""<div class="metric-card"><div class="metric-title">OYUNCU ŞUT PROJ.</div><div class="metric-value">{res['ev_sut_isabet'] + 1:.0f} İsabet</div><div style="font-size:11px; color:#aaa;">({ev} yıldızından)</div></div>""", unsafe_allow_html=True)
-                with p4:
+                with c_p3:
+                    st.markdown(f"""<div class="metric-card"><div class="metric-title">DISİPLİN / KART ORT.</div><div class="metric-value">{res['kart_tahmin']:.1f} Kart</div></div>""", unsafe_allow_html=True)
+                with c_p4:
                     st.markdown(f"""<div class="metric-card"><div class="metric-title">ÇİFTE ŞANS TAHMİNİ</div><div class="metric-value">{res['double_chance']}</div></div>""", unsafe_allow_html=True)
                 
-                # --- GRAFİKLER (İkinci Kısım) ---
+                # --- GRAFİKLER (MAX DETAY) ---
                 st.markdown("### 📊 GRAFİKSEL VERİ KARŞILAŞTIRMASI")
 
                 g1, g2 = st.columns([1, 1])
                 with g1:
-                    # Radar Grafiği
-                    categories = ['Hücum Gücü', 'Savunma Zafiyeti', 'Toplam Şut Ort.', 'Gol Yeme Ort.']
+                    # Radar Grafiği (Hata Düzeltildi)
+                    categories = ['Hücum', 'Savunma', 'Şut Ort.', 'İsabet Yüzdesi']
                     fig_radar = go.Figure()
-                    fig_radar.add_trace(go.Scatterpolar(r=[res['ev_gol']*20, res['ev_yed']*15, res['ev_sut_ort']*5, res['ev_yed']*25], theta=categories, fill='toself', name=ev, line_color='#00E676'))
-                    fig_radar.add_trace(go.Scatterpolar(r=[res['dep_gol']*20, res['dep_yed']*15, res['dep_sut_ort']*5, res['dep_yed']*25], theta=categories, fill='toself', name=dep, line_color='#FF5252'))
-                    fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font={'color':'white'}, height=300)
+                    fig_radar.add_trace(go.Scatterpolar(r=[res['ev_gol']*20, res['ev_yed']*15, res['ev_sut_ort']*3, res['sut_isabet_yuzdesi_ev']], theta=categories, fill='toself', name=ev, line_color='#00E676'))
+                    fig_radar.add_trace(go.Scatterpolar(r=[res['dep_gol']*20, res['dep_yed']*15, res['dep_sut_ort']*3, res['sut_isabet_yuzdesi_dep']], theta=categories, fill='toself', name=dep, line_color='#FF5252'))
+                    fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), title="Takım Güç Profili (Yüzde)", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font={'color':'white'}, height=300)
                     st.plotly_chart(fig_radar, use_container_width=True)
 
                 with g2:
-                    # Baskı Grafiği
-                    fig_baski = go.Figure()
-                    fig_baski.add_trace(go.Bar(y=['Şut Ort.'], x=[res['ev_sut_ort']], orientation='h', name=ev, marker_color='#00E676'))
-                    fig_baski.add_trace(go.Bar(y=['Şut Ort.'], x=[res['dep_sut_ort']], orientation='h', name=dep, marker_color='#FF5252'))
-                    fig_baski.update_layout(title="Hücum Yoğunluğu (Şut Ortalaması)", barmode='group', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font={'color':'white'}, height=300)
+                    # Baskı Grafiği (Şut vs İsabetli Şut)
+                    df_baski = pd.DataFrame({
+                        'Takım': [ev, dep, ev, dep],
+                        'Tip': ['Toplam Şut', 'Toplam Şut', 'İsabetli Şut', 'İsabetli Şut'],
+                        'Ortalama': [res['ev_sut_ort'], res['dep_sut_ort'], res['ev_sut_isabet'], res['dep_sut_isabet']],
+                        'Renk': ['Toplam', 'Toplam', 'İsabet', 'İsabet']
+                    })
+                    fig_baski = px.bar(df_baski, x='Takım', y='Ortalama', color='Tip', barmode='group',
+                                       title="Hücum Kalitesi ve Yoğunluğu", color_discrete_map={'Toplam Şut': '#B0BEC5', 'İsabetli Şut': '#00E676'})
+                    fig_baski.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font={'color':'white'}, height=300)
                     st.plotly_chart(fig_baski, use_container_width=True)
-
 
             else: st.error("Veri yetersiz.")
 
 # ================= SEKME 2: RAW İSTATİSTİK MERKEZİ =================
 with tab2:
     st.markdown("### 📝 TAKIM ORTALAMA İSTATİSTİKLERİ")
-    st.info("Bu tabloda Yapay Zekanın kullandığı **işlenmiş ortalama ham veri** (Maç Başı) yer alır.")
-    
     secilen_lig_raw = st.selectbox("Görüntülenecek Ligi Seçiniz:", list(lig_yapilandirma.keys()), key="raw_lig")
     df_raw_base = veri_yukle(secilen_lig_raw)
     
@@ -292,8 +302,13 @@ with tab2:
         st.error("Ham veri yüklenemedi.")
 
 
-# ================= SEKME 3: ASİSTAN =================
+# ================= SEKME 3: CANLI SKOR =================
 with tab3:
+    st.markdown("### 📺 CANLI MAÇ MERKEZİ")
+    components.html("""<iframe src="https://www.livescore.bz" width="100%" height="800" frameborder="0" style="background-color: white; border-radius: 8px;"></iframe>""", height=800, scrolling=True)
+
+# ================= SEKME 4: ASİSTAN =================
+with tab4:
     st.markdown("### 🤖 ASİSTAN JARVIS")
     if "messages" not in st.session_state: st.session_state.messages = [{"role": "assistant", "content": "Selam! Maçları sorabilirsin."}]
     for msg in st.session_state.messages: st.chat_message(msg["role"]).write(msg["content"])
