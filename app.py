@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components 
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
@@ -16,14 +17,10 @@ st.markdown("""
     .stApp { background-color: #050505; color: #E0E0E0; }
     h1, h2, h3, h4 { color: #00E676 !important; font-family: 'Arial Black', sans-serif; text-transform: uppercase; letter-spacing: 1px; }
     
-    /* YORUM KUTUSU */
-    .tactic-box {
-        background-color: #1E1E1E; padding: 20px; border-radius: 12px; border: 1px solid #333; margin-top: 10px;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important; 
-        font-size: 16px; line-height: 1.6; color: #ddd; 
-    }
-    .tactic-header { color: #00E676; font-weight: bold; font-size: 18px; border-bottom: 1px solid #444; padding-bottom: 10px; margin-bottom: 10px; }
-    
+    /* SEÇİM KUTULARI */
+    .stSelectbox label p { font-size: 16px !important; color: #00E676 !important; font-weight: bold; }
+    div[data-baseweb="select"] > div { background-color: #121212 !important; border: 1px solid #00E676 !important; color: white !important; }
+
     /* KARTLAR */
     .metric-card {
         background: linear-gradient(145deg, #1a1a1a, #121212);
@@ -32,15 +29,35 @@ st.markdown("""
     }
     .metric-value { font-size: 24px; font-weight: bold; color: white; margin-top: 5px; }
 
+    /* YORUM KUTUSU */
+    .tactic-box {
+        background-color: #1E1E1E; padding: 20px; border-radius: 12px; border: 1px solid #333; margin-top: 10px;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important; 
+        font-size: 16px; line-height: 1.6; color: #ddd; 
+    }
+    .tactic-header { color: #00E676; font-weight: bold; font-size: 18px; border-bottom: 1px solid #444; padding-bottom: 10px; margin-bottom: 10px; }
+    
     /* Buton */
-    .stButton>button { background-color: #00E676; color: black !important; font-weight: 900 !important; border-radius: 8px; height: 55px; border: 2px solid #00C853; width: 100%; font-size: 20px !important; box-shadow: 0 0 15px rgba(0, 230, 118, 0.4); }
+    .stButton>button { 
+        background-color: #00E676; color: black !important; font-weight: 900 !important; border-radius: 8px; height: 55px; border: 2px solid #00C853; width: 100%; font-size: 20px !important; box-shadow: 0 0 15px rgba(0, 230, 118, 0.4); 
+    }
     .stTabs [aria-selected="true"] { background-color: #00E676; color: black !important; font-weight: bold; border-radius: 5px; }
 </style>
 """, unsafe_allow_html=True)
 
 # --- VERİ VE FONKSİYON YAPILANDIRMASI ---
 
-# YENİ KAPSAM: Sadece 7 Büyük Lig
+# GÜNCEL TAKIM LİSTELERİ (FİLTRE AMAÇLI)
+GUNCEL_TAKIMLAR = {
+    "🇹🇷 Türkiye Süper Lig": ["Fenerbahçe", "Galatasaray", "Beşiktaş", "Trabzonspor", "Başakşehir", "Kasımpaşa", "Kocaelispor", "Konyaspor", "Kayserispor", "Gaziantep", "Sivasspor", "Alanyaspor", "Antalyaspor", "Hatayspor", "Samsunspor", "Göztepe", "Eyüpspor"],
+    "🇬🇧 İngiltere Premier": ["Man City", "Arsenal", "Liverpool", "Aston Villa", "Tottenham", "Chelsea", "Man Utd", "Newcastle", "Leicester", "Ipswich", "Southampton", "Crystal Palace", "Wolves", "Bournemouth", "Fulham", "Everton", "Brighton", "West Ham"],
+    "🇪🇸 İspanya La Liga": ["R. Madrid", "Barcelona", "Girona", "Atl. Madrid", "Athletic Club", "Real Sociedad", "Betis", "Valencia", "Villarreal", "Getafe", "Alavés", "Sevilla", "Osasuna", "Celta Vigo", "Rayo Vallecano", "Mallorca", "Leganés", "Valladolid"],
+    "🇩🇪 Almanya Bundesliga": ["Bayern Munich", "Dortmund", "Leverkusen", "Stuttgart", "RB Leipzig", "Eintracht Frankfurt", "Hoffenheim", "Freiburg", "Augsburg", "Werder Bremen", "Wolfsburg", "Mainz", "Union Berlin", "Bochum", "Heidenheim", "Holstein Kiel", "St. Pauli", "Fortuna Düsseldorf"],
+    "🇮🇹 İtalya Serie A": ["Inter", "Milan", "Juventus", "Bologna", "Atalanta", "Roma", "Lazio", "Fiorentina", "Torino", "Monza", "Genoa", "Empoli", "Verona", "Udinese", "Cagliari", "Lecce", "Como", "Venezia"],
+    "🇫🇷 Fransa Ligue 1": ["PSG", "Monaco", "Brest", "Lille", "Nice", "Lens", "Lyon", "Marseille", "Rennes", "Toulouse", "Montpellier", "Strasbourg", "Nantes", "Lorient", "St Etienne", "Auxerre", "Angers", "Le Havre"],
+    "🇵🇹 Portekiz Liga NOS": ["Benfica", "Porto", "Sporting CP", "Braga", "Vitoria Guimaraes", "Arouca", "Moreirense", "Farense", "Estoril", "Vizela", "Marítimo", "Académico Viseu", "Penafiel", "Rio Ave", "Boavista", "Casa Pia", "Famalicão", "Portimonense"]
+}
+
 lig_yapilandirma = {
     "🇹🇷 Türkiye Süper Lig": {"csv": "T1.csv", "live": "https://www.flashscore.mobi/standings/W6BOzpK2/U3MvIVsA/#table/overall"},
     "🇬🇧 İngiltere Premier": {"csv": "E0.csv", "live": "https://www.flashscore.mobi/standings/dYlOSQ44/W6DOvJ92/#table/overall"},
@@ -49,17 +66,6 @@ lig_yapilandirma = {
     "🇮🇹 İtalya Serie A": {"csv": "I1.csv", "live": "https://www.flashscore.mobi/standings/dYlOSQ44/W6DOvJ92/#table/overall"},
     "🇫🇷 Fransa Ligue 1": {"csv": "F1.csv", "live": "https://www.flashscore.mobi/standings/W6BOzpK2/U3MvIVsA/#table/overall"},
     "🇵🇹 Portekiz Liga NOS": {"csv": "P1.csv", "live": "https://www.flashscore.mobi"}
-}
-
-# GÜNCEL TAKIM LİSTELERİ (Eksik takımları eliyoruz)
-GUNCEL_TAKIMLAR = {
-    "🇹🇷 Türkiye Süper Lig": ["Fenerbahçe", "Galatasaray", "Beşiktaş", "Trabzonspor", "Başakşehir", "Kasımpaşa", "Kocaelispor", "Konyaspor", "Kayserispor", "Gaziantep", "Sivasspor", "Alanyaspor", "Antalyaspor", "Hatayspor", "Samsunspor", "Göztepe", "Eyüpspor"],
-    "🇬🇧 İngiltere Premier": ["Man City", "Arsenal", "Liverpool", "Aston Villa", "Tottenham", "Chelsea", "Man Utd", "Newcastle", "Leicester", "Ipswich", "Southampton", "Crystal Palace", "Wolves", "Bournemouth", "Fulham", "Everton", "Brighton", "West Ham"],
-    "🇩🇪 Almanya Bundesliga": ["Bayern Munich", "Dortmund", "Leverkusen", "Stuttgart", "RB Leipzig", "Eintracht Frankfurt", "Hoffenheim", "Freiburg", "Augsburg", "Werder Bremen", "Wolfsburg", "Mainz", "Union Berlin", "Bochum", "Heidenheim", "Holstein Kiel", "St. Pauli", "Fortuna Düsseldorf"],
-    "🇪🇸 İspanya La Liga": ["R. Madrid", "Barcelona", "Girona", "Atl. Madrid", "Athletic Club", "Real Sociedad", "Betis", "Valencia", "Villarreal", "Getafe", "Alavés", "Sevilla", "Osasuna", "Celta Vigo", "Rayo Vallecano", "Mallorca", "Leganés", "Valladolid"],
-    "🇮🇹 İtalya Serie A": ["Inter", "Milan", "Juventus", "Bologna", "Atalanta", "Roma", "Lazio", "Fiorentina", "Torino", "Monza", "Genoa", "Empoli", "Verona", "Udinese", "Cagliari", "Lecce", "Como", "Venezia"],
-    "🇫🇷 Fransa Ligue 1": ["PSG", "Monaco", "Brest", "Lille", "Nice", "Lens", "Lyon", "Marseille", "Rennes", "Toulouse", "Montpellier", "Strasbourg", "Nantes", "Lorient", "St Etienne", "Auxerre", "Angers", "Le Havre"],
-    "🇵🇹 Portekiz Liga NOS": ["Benfica", "Porto", "Sporting CP", "Braga", "Vitoria Guimaraes", "Arouca", "Moreirense", "Farense", "Estoril", "Vizela", "Marítimo", "Académico Viseu", "Penafiel", "Rio Ave", "Boavista", "Casa Pia", "Famalicão", "Portimonense"]
 }
 
 takim_duzeltme = {
@@ -90,7 +96,7 @@ def veri_yukle(lig_ad):
         df['HomeTeam'] = df['HomeTeam'].replace(takim_duzeltme)
         df['AwayTeam'] = df['AwayTeam'].replace(takim_duzeltme)
         
-        # GÜNCEL TAKIM FİLTRESİ
+        # GÜNCEL TAKIM LİSTESİ FİLTRESİ
         current_teams = GUNCEL_TAKIMLAR.get(lig_ad, df['HomeTeam'].unique())
         df = df[df['HomeTeam'].isin(current_teams) & df['AwayTeam'].isin(current_teams)]
         
@@ -185,13 +191,13 @@ def detayli_analiz_motoru(ev, dep, df):
 # --- ARAYÜZ ---
 st.title("🦁 FUTBOL KAHİNİ V32")
 
-# HATA DÜZELTİLDİ: 4 sekme doğru tanımlanıyor.
+# HATA DÜZELTİLDİ: Tab değişkenleri doğru tanımlanıyor
 tab1, tab2, tab3, tab4 = st.tabs(["📊 DETAYLI ANALİZ", "📝 RAW İSTATİSTİK MERKEZİ", "📺 CANLI SKOR", "🤖 ASİSTAN"]) 
 
 # ================= SEKME 1: MAKSİMUM DETAYLI ANALİZ =================
 with tab1:
     st.markdown("### 🕵️‍♂️ MAÇ ANALİZ ROBOTU")
-    st.info(f"📅 Bu analiz, 5 Aralık 2025 tarihli **mevcut veri tabanı** kullanılarak yapılmıştır. Tüm takımlar analiz edilebilir.")
+    st.info(f"📅 Bu analiz, 5 Aralık 2025 tarihli **mevcut veri tabanı** kullanılarak yapılmıştır.")
 
     c1, c2, c3 = st.columns([2,2,2])
     with c1: secilen_lig = st.selectbox("LİG SEÇİNİZ", list(lig_yapilandirma.keys()), key="analiz_lig")
@@ -246,7 +252,7 @@ with tab1:
                 with p1:
                     st.markdown(f"""<div class="metric-card"><div class="metric-title">GOL BAŞINA ŞUT (Verim)</div><div class="metric-value">{res['gol_basina_sut_ev']:.1f} ({ev})</div></div>""", unsafe_allow_html=True)
                 with p2:
-                    st.markdown(f"""<div class="metric-card"><div class="metric-title">DİSİPLİN RİSKİ (Faul Ort.)</div><div class="metric-value">{res['ev_faul_ort']:.1f} / {res['dep_faul_ort']:.1f}</div></div>""", unsafe_allow_html=True)
+                    st.markdown(f"""<div class="metric-card"><div class="metric-title">DİSİPLİN RİSKİ (Faul Ort.)</div><div class="metric-value">{res['ev_faul_ort'] + res['dep_faul_ort']:.1f} (Toplam)</div></div>""", unsafe_allow_html=True)
                 with p3:
                     st.markdown(f"""<div class="metric-card"><div class="metric-title">DEVRE/MAÇ SONUCU</div><div class="metric-value">{'1/1' if res['ibre'] > 65 else 'X/1'}</div></div>""", unsafe_allow_html=True)
                 with p4:
@@ -266,7 +272,7 @@ with tab1:
                     st.plotly_chart(fig_radar, use_container_width=True)
 
                 with g2:
-                    # Basketbar Grafiği (Şut vs İsabetli Şut)
+                    # Baskı Grafiği (Şut vs İsabetli Şut)
                     df_baski = pd.DataFrame({
                         'Takım': [ev, dep, ev, dep],
                         'Tip': ['Toplam Şut', 'Toplam Şut', 'İsabetli Şut', 'İsabetli Şut'],
@@ -277,15 +283,6 @@ with tab1:
                                        title="Hücum Kalitesi ve Yoğunluğu", color_discrete_map={'Toplam Şut': '#B0BEC5', 'İsabetli Şut': '#00E676'})
                     fig_baski.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font={'color':'white'}, height=300)
                     st.plotly_chart(fig_baski, use_container_width=True)
-                
-                # YENİ EK: SAVUNMA ZAFİYETLERİ
-                st.markdown("#### 🛡️ SAVUNMA VE DİSİPLİN ANALİZİ")
-                s1, s2 = st.columns(2)
-                with s1:
-                    st.info(f"Gol/Şut Verimi: **{ev}** gol atmak için **{res['gol_basina_sut_ev']:.1f}** şut atarken, **{dep}** takımı **{res['gol_basina_sut_dep']:.1f}** şut atıyor. (Düşük sayı = Daha Verimli)")
-                with s2:
-                    st.info(f"Disiplin: Maç başı faul ortalaması **{ev}** için **{res['ev_faul_ort']:.1f}**, **{dep}** için **{res['dep_faul_ort']:.1f}**. (Yüksek sayı = Daha Sert Oyun)")
-
 
             else: st.error("Veri yetersiz.")
 
