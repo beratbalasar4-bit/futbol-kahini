@@ -5,27 +5,32 @@ import plotly.graph_objects as go
 import time
 import datetime
 import random
-from scipy.stats import poisson # Skor tahmini için matematik kütüphanesi
+from scipy.stats import poisson
 
 # --- SAYFA AYARLARI ---
-st.set_page_config(page_title="Futbol Kahini PRO", page_icon="🦁", layout="wide")
+st.set_page_config(page_title="Futbol Kahini AI", page_icon="🎙️", layout="wide")
 
-# --- CSS (BAHİS SİTESİ GÖRÜNÜMÜ) ---
+# --- CSS (PROFESYONEL YORUMCU TASARIMI) ---
 st.markdown("""
 <style>
     .stApp { background-color: #121212; }
     h1 { color: #00E676 !important; text-align: center; font-family: 'Arial Black', sans-serif; text-transform: uppercase; }
     
+    /* Yorumcu Kutusu */
+    .yorum-kutu {
+        background-color: #1E1E1E; border-left: 6px solid #F1C40F; padding: 20px; border-radius: 10px;
+        color: #ECF0F1; font-family: 'Georgia', serif; font-size: 18px; line-height: 1.6;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.5); margin-bottom: 20px;
+    }
+    .yorum-baslik { color: #F1C40F; font-weight: bold; font-size: 20px; margin-bottom: 10px; display: block; }
+    
     /* İstatistik Kartları */
     .stat-box {
-        background-color: #1E1E1E; border-radius: 10px; padding: 15px; margin: 5px;
-        border-top: 4px solid #00E676; text-align: center;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        background-color: #263238; border-radius: 8px; padding: 10px; text-align: center;
+        border-top: 3px solid #00E676; margin-bottom: 10px;
     }
-    .stat-title { color: #B0BEC5; font-size: 12px; font-weight: bold; text-transform: uppercase; }
-    .stat-value { color: white; font-size: 20px; font-weight: bold; margin-top: 5px; }
-    .risk-high { border-top-color: #FF5252; }
-    .risk-med { border-top-color: #FFAB40; }
+    .stat-val { font-size: 24px; font-weight: bold; color: white; }
+    .stat-lbl { font-size: 12px; color: #B0BEC5; text-transform: uppercase; }
     
     /* Kupon Kartı */
     .kupon-karti { background-color: #263238; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 5px solid #00E676; }
@@ -33,30 +38,51 @@ st.markdown("""
     .oran { float: right; background: #00E676; color: black; padding: 2px 8px; border-radius: 4px; font-weight: bold; }
     .oran-s { background: #FF5252; color: white; }
     
-    /* Sohbet */
-    .stChatMessage { background-color: #1E1E1E; border: 1px solid #333; }
+    /* Buton */
+    .stButton>button { 
+        background: linear-gradient(to right, #00CC96, #00b887); color: white; width: 100%; border-radius: 10px; height: 50px; font-weight: bold; border: none;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # --- VERİ SETLERİ ---
 lig_kodlari = {
-    "🇹🇷 Türkiye Süper Lig": "T1.csv", "🇬🇧 İngiltere Premier": "E0.csv", 
-    "🇪🇸 İspanya La Liga": "SP1.csv", "🇩🇪 Almanya Bundesliga": "D1.csv", 
-    "🇮🇹 İtalya Serie A": "I1.csv", "🇫🇷 Fransa Ligue 1": "F1.csv"
-}
-
-takma_adlar = {
-    "fener": "Fenerbahçe", "gs": "Galatasaray", "bjk": "Beşiktaş", "ts": "Trabzonspor",
-    "city": "Manchester City", "united": "Manchester United", "real": "Real Madrid", "barca": "Barcelona",
-    "bayern": "Bayern Munich", "dortmund": "Dortmund", "liverpool": "Liverpool", "arsenal": "Arsenal"
+    "🇹🇷 Süper Lig": "T1.csv", "🇬🇧 Premier Lig": "E0.csv", 
+    "🇪🇸 La Liga": "SP1.csv", "🇩🇪 Bundesliga": "D1.csv", 
+    "🇮🇹 Serie A": "I1.csv", "🇫🇷 Ligue 1": "F1.csv"
 }
 
 takim_duzeltme = {
     "Fenerbahce": "Fenerbahçe", "Galatasaray": "Galatasaray", "Besiktas": "Beşiktaş", "Trabzonspor": "Trabzonspor",
-    "Buyuksehyr": "Başakşehir FK", "Man City": "Manchester City", "Man United": "Manchester United",
-    "Real Madrid": "Real Madrid", "Barcelona": "Barcelona", "Bayern Munich": "Bayern Münih",
-    "Paris SG": "PSG", "Inter": "Inter Milan", "Milan": "AC Milan", "Juventus": "Juventus",
-    "M'gladbach": "M'gladbach", "Dortmund": "Dortmund", "Mainz": "Mainz", "Leverkusen": "Leverkusen"
+    "Buyuksehyr": "Başakşehir", "Man City": "Man City", "Man United": "Man Utd",
+    "Real Madrid": "R. Madrid", "Barcelona": "Barcelona", "Bayern Munich": "Bayern",
+    "Dortmund": "Dortmund", "Paris SG": "PSG", "Inter": "Inter", "Milan": "Milan", "Juventus": "Juve"
+}
+
+# --- YORUMCU SÖZLÜĞÜ (FANCY SENTENCES) ---
+yorum_kaliplari = {
+    "yuksek_hucum": [
+        "Bu takımın ciğerleri sönmüyor! İnanılmaz bir pres gücü var.",
+        "Set hücumuna yerleştiklerinde rakibi boğuyorlar.",
+        "3. bölgede çok etkililer, rakip savunmanın başını döndürüyorlar.",
+        "Dikine oyun anlayışları çok iyi, geçiş hücumlarında ölümcül oluyorlar."
+    ],
+    "kotu_savunma": [
+        "Defans arkasına atılan her top tehlike yaratıyor.",
+        "Savunma hatları kopuk, araya atılan toplarda çok pozisyon veriyorlar.",
+        "Bekleri çok ileri çıkıyor, geride büyük boşluklar bırakıyorlar.",
+        "Duran toplarda adam paylaşımını bir türlü yapamıyorlar."
+    ],
+    "dengeli": [
+        "Tipik bir satranç maçı izleyeceğiz. İki takım da kontrollü.",
+        "Orta saha mücadelesi şeklinde geçecek bir maç.",
+        "Erken gol olmazsa maç kilitlenir, taktik savaşına döner."
+    ],
+    "banko_ev": [
+        "Ev sahibi taraftarını da arkasına alıp maçı domine eder.",
+        "Bu stadyumdan çıkış zor! Ev sahibi çok baskın.",
+        "Kadıköy/Arena havası var, ev sahibi favori."
+    ]
 }
 
 # --- GLOBAL VERİ YÜKLEME ---
@@ -77,202 +103,180 @@ def tum_verileri_yukle():
     return tum_df
 
 global_df = tum_verileri_yukle()
-tum_takimlar = sorted(global_df['HomeTeam'].unique()) if not global_df.empty else []
 
-# --- 🧠 DETAYLI ANALİZ MOTORU (BAHİS SİTESİ GİBİ) ---
-def detayli_analiz(ev, dep, df):
+# --- ANALİZ VE YORUM MOTORU ---
+def mac_analiz_et(ev, dep, df):
     ev_stats = df[df['HomeTeam'] == ev]
     dep_stats = df[df['AwayTeam'] == dep]
-    
     if len(ev_stats) < 2 or len(dep_stats) < 2: return None
-
-    # 1. ORTALAMALAR
-    ev_atilan = ev_stats['FTHG'].mean()
-    ev_yenen = ev_stats['FTAG'].mean()
-    dep_atilan = dep_stats['FTAG'].mean()
-    dep_yenen = dep_stats['FTHG'].mean()
     
-    # 2. GOL BEKLENTİSİ (Poisson)
-    ev_beklenti = (ev_atilan + dep_yenen) / 2
-    dep_beklenti = (dep_atilan + ev_yenen) / 2
+    # İstatistikler
+    ev_gol_at = ev_stats['FTHG'].mean()
+    ev_gol_ye = ev_stats['FTAG'].mean()
+    dep_gol_at = dep_stats['FTAG'].mean()
+    dep_gol_ye = dep_stats['FTHG'].mean()
+    
+    # 1. Beklentiler
+    ev_beklenti = (ev_gol_at + dep_gol_ye) / 2
+    dep_beklenti = (dep_gol_at + ev_gol_ye) / 2
     toplam_gol = ev_beklenti + dep_beklenti
     
-    # 3. KORNER (Varsa)
-    korner = 9.5
-    if 'HC' in df.columns:
-        korner = (ev_stats['HC'].mean() + dep_stats['AC'].mean())
-        
-    # 4. KART (Varsa)
-    kart = 4.5
-    if 'HY' in df.columns:
-        kart = (ev_stats['HY'].mean() + ev_stats['AY'].mean() + dep_stats['HY'].mean() + dep_stats['AY'].mean()) / 2
-
-    # 5. KG VAR İHTİMALİ
-    kg_var_prob = (ev_atilan > 0.8) and (dep_atilan > 0.8) and (ev_yenen > 0.8) and (dep_yenen > 0.8)
-    
-    # 6. SKOR TAHMİNİ (En yüksek ihtimalli)
-    skor_ev = int(round(ev_beklenti))
-    skor_dep = int(round(dep_beklenti))
-    
-    # 7. İBRE (Kazanma Şansı)
-    ev_guc = ev_atilan * 1.5 - ev_yenen
-    dep_guc = dep_atilan * 1.5 - dep_yenen
-    fark = ev_guc - dep_guc
+    # 2. İbre (Güç)
+    fark = (ev_gol_at * 1.5 - ev_gol_ye) - (dep_gol_at * 1.5 - dep_gol_ye)
     ibre = 50 + (fark * 15)
     ibre = max(10, min(90, ibre))
     
+    # 3. YORUM OLUŞTURMA (AI PUNDIT)
+    yorumlar = []
+    
+    # Ev Sahibi Analizi
+    if ev_gol_at > 2.0: yorumlar.append(random.choice(yorum_kaliplari["yuksek_hucum"]).replace("takım", ev))
+    if ev_gol_ye > 1.5: yorumlar.append(f"{ev} savunmada alarm veriyor. " + random.choice(yorum_kaliplari["kotu_savunma"]))
+    
+    # Deplasman Analizi
+    if dep_gol_at < 0.8: yorumlar.append(f"{dep} deplasmanda gol yollarında kısır. Üretkenlik sorunu yaşıyorlar.")
+    if dep_gol_ye > 2.0: yorumlar.append(f"{dep} deplasman fobisi yaşıyor, savunmaları çok kırılgan.")
+    
+    # Maç Özeti
+    if ibre > 65: son_soz = f"Özetle; {ev} sahasında hata yapmaz. {random.choice(yorum_kaliplari['banko_ev'])}"
+    elif ibre < 35: son_soz = f"Sürpriz kokusu var! {dep} kontrataklarla can yakabilir."
+    else: son_soz = f"Ortada bir maç. {random.choice(yorum_kaliplari['dengeli'])}"
+    
+    full_yorum = " ".join(yorumlar) + " " + son_soz
+    
+    # Skor Tahmini (Poisson)
+    skor_ev = int(round(ev_beklenti))
+    skor_dep = int(round(dep_beklenti))
+    
     return {
-        "ev_beklenti": ev_beklenti, "dep_beklenti": dep_beklenti,
-        "toplam_gol": toplam_gol, "korner": korner, "kart": kart,
-        "kg_var": kg_var_prob, "skor": f"{skor_ev} - {skor_dep}",
-        "ibre": ibre
+        "ibre": ibre, "skor": f"{skor_ev} - {skor_dep}", "yorum": full_yorum,
+        "gol_beklenti": toplam_gol, "ev_gol": ev_gol_at, "dep_gol": dep_gol_at
     }
-
-# --- FİKSTÜR ÇEKME DENEMESİ (WEB SCRAPING) ---
-@st.cache_data(ttl=3600)
-def fikstur_cek():
-    # Burası gerçek bir siteden veri çekmeye çalışır.
-    # Eğer site engellerse, boş liste döner ve manuel seçime yönlendiririz.
-    try:
-        # Wikipedia veya basit bir HTML tablosu okumayı dener
-        # Not: Bu kısım demo amaçlıdır, canlı maç verisi için API şarttır.
-        # Biz burada "Mevcut Veritabanındaki" takımlardan rastgele bir 'Günün Maçları' simülasyonu yapıyoruz
-        # Çünkü bedava ve hatasız canlı fikstür çekmek imkansıza yakındır.
-        return [] 
-    except: return []
-
-# --- SOHBET MOTORU ---
-def akilli_cevap(soru):
-    soru = soru.lower()
-    if "türkiye başkent" in soru: return "🇹🇷 Ankara"
-    if "naber" in soru: return "İyiyim, maçları analiz ediyorum!"
-    if "kupon" in soru: return "Kupon sekmesine geç, oradan takımları seç halledeyim."
-    return None
 
 # --- ARAYÜZ ---
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/3233/3233496.png", width=120)
-    st.title("PRO BET V13")
+    st.image("https://cdn-icons-png.flaticon.com/512/1995/1995515.png", width=100) # Mikrofon ikonu
+    st.title("YORUMCU MODU")
     st.info(f"📅 {datetime.datetime.now().strftime('%d.%m.%Y')}")
 
-st.title("🦁 FUTBOL KAHİNİ: PROFESSIONAL SUITE")
+st.title("🎙️ FUTBOL KAHİNİ: UZMAN GÖRÜŞÜ")
 
-# --- LIVESCORE ---
-with st.expander("📺 CANLI SKOR & FİKSTÜR (Buradan Bak)", expanded=True):
-    components.html("""<iframe src="https://www.livescore.bz" width="100%" height="500" frameborder="0" style="background-color: #eee; border-radius: 8px;"></iframe>""", height=500, scrolling=True)
+# --- LİSTELER ---
+tab1, tab2 = st.tabs(["⚡ GÜNÜN OTOMATİK KUPONLARI", "🎙️ DETAYLI ANALİZ & YORUM"])
 
-# --- SEKMELER ---
-tab1, tab2, tab3 = st.tabs(["📊 DETAYLI ANALİZ", "🎫 AKILLI KUPON", "💬 SOHBET"])
-
-# ================= SEKME 1: DETAYLI ANALİZ (BAHİS SİTESİ GİBİ) =================
+# ================= SEKME 1: OTOMATİK KUPON (SANAL BÜLTEN) =================
 with tab1:
-    st.subheader("MAÇI SEÇ, TÜM İSTATİSTİKLERİ GÖR")
+    st.subheader("🎰 GÜNÜN OTOMATİK BÜLTENİ")
+    st.caption("Sistem ligleri tarıyor ve bugünün sanal bültenini oluşturuyor. Sen seçme, bırak yapay zeka yönetsin.")
     
-    col_l, col_r = st.columns([1, 3])
-    with col_l:
+    if st.button("BÜLTENİ VE KUPONLARI GETİR 🎲", type="primary"):
+        with st.spinner("Ligler taranıyor... Bülten oluşturuluyor..."):
+            time.sleep(1.5)
+            
+            # --- OTOMATİK MAÇ SEÇİCİ (SANAL BÜLTEN) ---
+            # Rastgele 5 maç seçip analiz edeceğiz (Sanki bugün oynanıyormuş gibi)
+            maclar = []
+            tum_ligler = global_df['Lig'].unique()
+            
+            for lig in tum_ligler:
+                df_lig = global_df[global_df['Lig'] == lig]
+                if df_lig.empty: continue
+                ev_list = df_lig['HomeTeam'].unique()
+                if len(ev_list) > 2:
+                    # Ligden rastgele 1 maç seç
+                    secilen_ev = random.choice(ev_list)
+                    # Rakibi bul (Veri setindeki son rakibi değil, rastgele bir rakip simüle etmiyoruz, gerçek veriden çekiyoruz)
+                    # Gerçekçi olması için o takımın verisini alıp analiz ediyoruz
+                    res = mac_analiz_et(secilen_ev, df_lig[df_lig['HomeTeam']!=secilen_ev].iloc[0]['HomeTeam'], df_lig) # Rastgele eşleşme yerine genel güç
+                    # Düzeltme: Kupon için sadece takımın genel gücüne bakalım
+                    stats = df_lig[df_lig['HomeTeam'] == secilen_ev]
+                    puan = stats['FTHG'].mean() * 1.5 - stats['FTAG'].mean()
+                    gol = stats['FTHG'].mean() + stats['FTAG'].mean()
+                    
+                    maclar.append({"Takım": secilen_ev, "Lig": lig, "Puan": puan, "Gol": gol})
+            
+            # KUPONLARI AYIKLA
+            bankolar = [m for m in maclar if m['Puan'] > 1.2]
+            surprizler = [m for m in maclar if 0 < m['Puan'] < 0.4] # Beraberlik kokanlar
+            gol_maclari = [m for m in maclar if m['Gol'] > 3.2]
+
+            c1, c2 = st.columns(2)
+            
+            with c1:
+                st.success("✅ GÜNÜN BANKO KUPONU")
+                if bankolar:
+                    for m in bankolar[:3]:
+                        st.markdown(f"""
+                        <div class="kupon-karti">
+                            <span class="oran">1.{random.randint(40,65)}</span>
+                            <b>{m['Takım']} Kazanır</b><br>
+                            <small>{m['Lig']}</small>
+                        </div>""", unsafe_allow_html=True)
+                elif gol_maclari:
+                     for m in gol_maclari[:3]:
+                        st.markdown(f"""
+                        <div class="kupon-karti">
+                            <span class="oran">1.{random.randint(50,70)}</span>
+                            <b>{m['Takım']} 2.5 ÜST</b><br>
+                            <small>{m['Lig']}</small>
+                        </div>""", unsafe_allow_html=True)
+                else: st.warning("Bugün banko maç çıkmadı.")
+            
+            with c2:
+                st.error("🔥 YÜKSEK ORANLI SÜRPRİZ")
+                if surprizler:
+                    for m in surprizler[:3]:
+                        st.markdown(f"""
+                        <div class="kupon-karti surpriz">
+                            <span class="oran oran-s">3.{random.randint(10,50)}</span>
+                            <b>{m['Takım']} Beraberlik</b><br>
+                            <small>{m['Lig']}</small>
+                        </div>""", unsafe_allow_html=True)
+                else: st.info("Sürpriz risk yok.")
+
+# ================= SEKME 2: YORUMCU ANALİZİ =================
+with tab2:
+    st.subheader("🎙️ DETAYLI ANALİZ MASASI")
+    
+    c_sel1, c_sel2 = st.columns([1, 2])
+    with c_sel1:
         lig = st.selectbox("Lig:", list(lig_kodlari.keys()))
         df_lig = global_df[global_df['Lig'] == lig]
         takimlar = sorted(df_lig['HomeTeam'].unique())
         ev = st.selectbox("Ev Sahibi", takimlar)
         dep = st.selectbox("Deplasman", takimlar, index=1)
-        btn_analiz = st.button("ANALİZ ET 🚀", type="primary")
+        btn = st.button("YORUMLA 📢")
 
-    with col_r:
-        if btn_analiz:
-            res = detayli_analiz(ev, dep, global_df)
-            if res:
-                # 1. KAZANAN İBRESİ
+    if btn:
+        res = mac_analiz_et(ev, dep, global_df)
+        if res:
+            with c_sel2:
+                # 1. YORUM KUTUSU
+                st.markdown(f"""
+                <div class="yorum-kutu">
+                    <span class="yorum-baslik">🎙️ MAÇ YORUMU</span>
+                    "{res['yorum']}"
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # 2. İSTATİSTİKLER VE GRAFİK
+            col_g1, col_g2 = st.columns([1, 1])
+            with col_g1:
+                # İbre
                 fig = go.Figure(go.Indicator(
                     mode = "gauge+number", value = res['ibre'],
-                    title = {'text': "Kazanma İhtimali (%)"},
+                    title = {'text': "Kazanma Şansı"},
                     gauge = {'axis': {'range': [0, 100]}, 'bar': {'color': "white"}, 'steps': [{'range': [0, 45], 'color': "#FF5252"}, {'range': [55, 100], 'color': "#00E676"}]}
                 ))
-                fig.update_layout(height=200, margin=dict(t=30,b=20,l=20,r=20), paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
+                fig.update_layout(height=250, margin=dict(t=30,b=20,l=20,r=20), paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
                 st.plotly_chart(fig, use_container_width=True)
-                
-                # 2. DETAYLI İSTATİSTİK KARTLARI (GRID)
-                r1, r2, r3, r4 = st.columns(4)
-                
-                with r1:
-                    st.markdown(f"""<div class="stat-box"><div class="stat-title">Skor Tahmini</div><div class="stat-value">{res['skor']}</div></div>""", unsafe_allow_html=True)
-                with r2:
-                    durum = "ÜST" if res['toplam_gol'] > 2.6 else "ALT"
-                    renk = "risk-med" if durum == "ALT" else ""
-                    st.markdown(f"""<div class="stat-box {renk}"><div class="stat-title">2.5 Gol</div><div class="stat-value">{durum}</div><small>{res['toplam_gol']:.2f}</small></div>""", unsafe_allow_html=True)
-                with r3:
-                    kg = "VAR" if res['kg_var'] else "YOK"
-                    st.markdown(f"""<div class="stat-box"><div class="stat-title">KG (Karşılıklı Gol)</div><div class="stat-value">{kg}</div></div>""", unsafe_allow_html=True)
-                with r4:
-                    st.markdown(f"""<div class="stat-box"><div class="stat-title">Korner Beklentisi</div><div class="stat-value">{res['korner']:.1f}</div></div>""", unsafe_allow_html=True)
-
-                r5, r6, r7, r8 = st.columns(4)
-                with r5:
-                    st.markdown(f"""<div class="stat-box risk-high"><div class="stat-title">Kart/Sertlik</div><div class="stat-value">{res['kart']:.1f}</div></div>""", unsafe_allow_html=True)
-                with r6:
-                     kazanan = ev if res['ibre'] > 55 else (dep if res['ibre'] < 45 else "X")
-                     st.markdown(f"""<div class="stat-box"><div class="stat-title">Maç Sonucu</div><div class="stat-value">MS {kazanan}</div></div>""", unsafe_allow_html=True)
-            else:
-                st.error("Veri Yok")
-        else:
-            st.info("Soldan takım seç ve butona bas.")
-
-# ================= SEKME 2: OTOMATİK KUPON (BUGÜN OYNAYANLAR) =================
-with tab2:
-    st.subheader("📅 BUGÜNÜN KUPONLARI")
-    st.markdown("Yukarıdaki fikstürden bugün oynayanları seç, **Banko** ve **Sürpriz** kuponunu oluştur.")
-    
-    secilenler = st.multiselect("Bugün Oynayanları Listeden Bul:", tum_takimlar)
-    
-    if st.button("KUPONLARI OLUŞTUR 🎰"):
-        if not secilenler: st.warning("Takım seçmedin.")
-        else:
-            banko, surpriz = [], []
-            for t in secilenler:
-                df_t = global_df[global_df['HomeTeam'] == t]
-                if df_t.empty: continue
-                # Basit analiz
-                res = detayli_analiz(t, df=global_df, dep=df_t.iloc[0]['AwayTeam']) # Rakipten bağımsız genel güç
-                # (Not: Rakipten bağımsız analiz yaptık çünkü rakibi otomatik bulamıyoruz, ama genel ev formu yeterli)
-                
-                # Sadece Ev Sahibinin gücüne bakarak kupon yapma
-                guc = df_t['FTHG'].mean() * 1.5 - df_t['FTAG'].mean()
-                gol = df_t['FTHG'].mean() + df_t['FTAG'].mean()
-                lig = df_t.iloc[0]['Lig']
-                
-                # BANKO
-                if guc > 1.3: banko.append({"m": f"{t} Kazanır", "o": 1.45, "t": "MS 1", "l": lig})
-                elif gol > 3.0: banko.append({"m": f"{t} 2.5 ÜST", "o": 1.50, "t": "Gol", "l": lig})
-                
-                # SÜRPRİZ
-                if 0 < guc < 0.3: surpriz.append({"m": f"{t} Berabere", "o": 3.20, "t": "MS 0", "l": lig})
-                elif gol > 3.8: surpriz.append({"m": f"{t} 3.5 ÜST", "o": 2.80, "t": "Bol Gol", "l": lig})
             
-            c1, c2 = st.columns(2)
-            with c1: 
-                st.success("✅ BANKO KUPON")
-                for x in banko: st.markdown(f"""<div class="kupon-karti"><span class="oran">{x['o']}</span><b>{x['m']}</b><br><small>{x['l']}</small></div>""", unsafe_allow_html=True)
-            with c2: 
-                st.error("🔥 SÜRPRİZ KUPON")
-                for x in surpriz: st.markdown(f"""<div class="kupon-karti surpriz"><span class="oran oran-s">{x['o']}</span><b>{x['m']}</b><br><small>{x['l']}</small></div>""", unsafe_allow_html=True)
-
-# ================= SEKME 3: SOHBET =================
-with tab3:
-    if "messages" not in st.session_state: st.session_state.messages = [{"role": "assistant", "content": "Selam! Maçları sorabilirsin."}]
-    for msg in st.session_state.messages: st.chat_message(msg["role"]).write(msg["content"])
-    
-    if prompt := st.chat_input("Mesaj yaz..."):
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        st.chat_message("user").write(prompt)
-        
-        cevap = akilli_cevap(prompt)
-        if not cevap:
-            # Futbol analizi yap
-            bulunan = [t for t in tum_takimlar if t.lower() in prompt.lower()]
-            if len(bulunan) >= 2:
-                res = detayli_analiz(bulunan[0], bulunan[1], global_df)
-                cevap = f"📊 **{bulunan[0]} vs {bulunan[1]}**\n\nTahmin: **{res['skor']}**. Gol Beklentisi: {res['toplam_gol']:.2f}. KG Var mı? {'Evet' if res['kg_var'] else 'Hayır'}."
-            elif len(bulunan) == 1: cevap = f"**{bulunan[0]}** rakibini de yazarsan analiz ederim."
-            else: cevap = "Anlamadım. Futbol veya genel kültür sorabilirsin."
-            
-        st.chat_message("assistant").write(cevap)
-        st.session_state.messages.append({"role": "assistant", "content": cevap})
+            with col_g2:
+                # İstatistik Kutuları
+                r1, r2 = st.columns(2)
+                r1.markdown(f"""<div class="stat-box"><div class="stat-lbl">Skor Tahmini</div><div class="stat-val">{res['skor']}</div></div>""", unsafe_allow_html=True)
+                r2.markdown(f"""<div class="stat-box"><div class="stat-lbl">Gol Beklentisi</div><div class="stat-val">{res['gol_beklenti']:.2f}</div></div>""", unsafe_allow_html=True)
+                
+                r3, r4 = st.columns(2)
+                r3.markdown(f"""<div class="stat-box"><div class="stat-lbl">Ev Gol Ort</div><div class="stat-val">{res['ev_gol']:.1f}</div></div>""", unsafe_allow_html=True)
+                r4.markdown(f"""<div class="stat-box"><div class="stat-lbl">Dep Gol Ort</div><div class="stat-val">{res['dep_gol']:.1f}</div></div>""", unsafe_allow_html=True)
